@@ -145,6 +145,20 @@ function listText(values: string[]) {
 function canAfford(state: GameState, costs: Record<string, number> = {}) {
   return Object.entries(costs).every(([id, amount]) => (state.inventory[id] ?? 0) >= amount);
 }
+function outpostDevelopment(state: GameState, sectorId: string, type: OutpostType) {
+  const existing = state.outposts[sectorId];
+  const converting = Boolean(existing && existing.type !== type);
+  const level = existing ? (converting ? existing.level : existing.level + 1) : 1;
+  const starterCost = { salvage: 10, circuits: 2 };
+  const specialistCosts: Record<OutpostType, Record<string, number>> = {
+    mining: { plating: level * 4, circuits: level * 3 },
+    research: { circuits: level * 4, data: level * 8 },
+    trade: { plating: level * 3, navData: level * 5 },
+  };
+  const items = !existing && level === 1 ? starterCost : specialistCosts[type];
+  const credits = (converting ? 400 : 250) * level;
+  return { existing, converting, level, items, credits };
+}
 function spend(inventory: Record<string, number>, costs: Record<string, number>) {
   const next = { ...inventory };
   Object.entries(costs).forEach(([id, amount]) => { next[id] = (next[id] ?? 0) - amount; });
@@ -666,13 +680,10 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
 
   const developOutpost = (sectorId: string, type: OutpostType) => updateState((current) => {
     if (current.sectorId !== sectorId) return current;
-    const existing = current.outposts[sectorId];
-    const nextLevel = existing?.type === type ? existing.level + 1 : 1;
-    if (nextLevel > 10) return current;
-    const cost = { plating: nextLevel * 4, circuits: nextLevel * 3 };
-    const credits = nextLevel * 250;
-    if (!canAfford(current, cost) || current.credits < credits) return current;
-    return { ...current, inventory: spend(current.inventory, cost), credits: current.credits - credits, outposts: { ...current.outposts, [sectorId]: { type, level: nextLevel } }, storyLog: [`${sectorById[sectorId].name} ${type} outpost advanced to level ${nextLevel}.`, ...current.storyLog].slice(0, 100), lastActiveAt: Date.now() };
+    const plan = outpostDevelopment(current, sectorId, type);
+    if (plan.level > 10 || !canAfford(current, plan.items) || current.credits < plan.credits) return current;
+    const action = plan.converting ? "converted to" : plan.existing ? "advanced to" : "established at";
+    return { ...current, inventory: spend(current.inventory, plan.items), credits: current.credits - plan.credits, outposts: { ...current.outposts, [sectorId]: { type, level: plan.level } }, storyLog: [`${sectorById[sectorId].name} outpost ${action} ${type} level ${plan.level}.`, ...current.storyLog].slice(0, 100), lastActiveAt: Date.now() };
   });
 
   const equipUniqueGear = (id: string) => updateState((current) => (current.inventory[id] ?? 0) > 0 ? { ...current, equippedGear: id, lastActiveAt: Date.now() } : current);
@@ -1004,7 +1015,20 @@ function ResearchView({ state, onUnlock, onChoosePath }: { state: GameState; onU
 
 function OutpostView({ state, onDevelop }: { state: GameState; onDevelop: (sectorId: string, type: OutpostType) => void }) {
   const types: Record<OutpostType, string> = { mining: "+1 gathered Mining and Salvage output per level", research: "+1 Science and Archaeology output per level", trade: "+4% operation credits per level" };
-  return <><div className="notice panel">Outposts deepen the existing five sectors. No additional locations are introduced.</div><div className="module-grid">{sectors.map((sector) => { const outpost = state.outposts[sector.id]; return <article key={sector.id} className="outpost-card panel"><span><Landmark /></span><div><p className="eyebrow">{sector.name.toUpperCase()} · {state.sectorId === sector.id ? "IN ORBIT" : "REMOTE"}</p><h3>{outpost ? `${outpost.type} outpost · Level ${outpost.level}` : "No outpost established"}</h3><p>{outpost ? types[outpost.type] : "Travel here to establish one of three support doctrines."}</p>{state.sectorId === sector.id ? <div className="outpost-actions">{(Object.keys(types) as OutpostType[]).map((type) => { const level = outpost?.type === type ? outpost.level + 1 : 1; return <Button key={type} variant="outline" disabled={level > 10} onClick={() => onDevelop(sector.id, type)}>{type} · {level * 250} cr</Button>; })}</div> : null}</div></article>; })}</div></>;
+  const resourceIds = ["salvage", "plating", "circuits", "data", "navData"];
+  return <><section className="outpost-overview panel"><div><p className="eyebrow">FIVE-SECTOR INFRASTRUCTURE</p><h2>Develop the sector you are currently orbiting</h2><p>Establish one doctrine per sector, upgrade it to level 10, or convert it without losing levels.</p></div><div className="outpost-resources"><span><Coins />{fmt(state.credits)} credits</span>{resourceIds.map((id) => <span key={id}>{fmt(state.inventory[id] ?? 0)} {itemNames[id]}</span>)}</div></section><div className="outpost-list">{sectors.map((sector) => {
+    const outpost = state.outposts[sector.id];
+    const local = state.sectorId === sector.id;
+    return <article key={sector.id} className={`outpost-card panel ${local ? "current" : ""}`}><span><Landmark /></span><div className="outpost-card-body"><div className="outpost-heading"><div><p className="eyebrow">{sector.name.toUpperCase()} · {local ? "IN ORBIT" : "REMOTE"}</p><h3>{outpost ? `${outpost.type[0].toUpperCase()}${outpost.type.slice(1)} outpost` : "Unclaimed outpost site"}</h3></div><b>{outpost ? `LEVEL ${outpost.level}` : "NOT BUILT"}</b></div>{outpost ? <><p className="outpost-bonus">Active bonus: {types[outpost.type]}</p><Progress value={outpost.level * 10} /></> : <p>Build the first level with Salvage and Circuits, then specialise its supply chain.</p>}{local ? <div className="outpost-options">{(Object.keys(types) as OutpostType[]).map((type) => {
+      const plan = outpostDevelopment(state, sector.id, type);
+      const maxed = !plan.converting && plan.level > 10;
+      const missingItems = Object.entries(plan.items).filter(([id, amount]) => (state.inventory[id] ?? 0) < amount).map(([id, amount]) => `${amount - (state.inventory[id] ?? 0)} more ${itemNames[id] ?? id}`);
+      if (state.credits < plan.credits) missingItems.unshift(`${plan.credits - state.credits} more credits`);
+      const available = !maxed && missingItems.length === 0;
+      const verb = plan.converting ? "Convert" : outpost ? "Upgrade" : "Establish";
+      return <section key={type} className={outpost?.type === type ? "selected" : ""}><div><strong>{type[0].toUpperCase()}{type.slice(1)}</strong>{outpost?.type === type ? <em>ACTIVE</em> : null}</div><p>{types[type]}</p><small>{maxed ? "Maximum level reached" : `${fmt(plan.credits)} credits · ${itemsText(plan.items)}`}</small><Button disabled={!available} onClick={() => onDevelop(sector.id, type)}>{maxed ? "Level 10" : available ? `${verb} level ${plan.level}` : `Missing: ${missingItems.join(" · ")}`}</Button></section>;
+    })}</div> : <div className="outpost-remote"><Compass /> Travel to {sector.name} using the Star Chart to develop this site.</div>}</div></article>;
+  })}</div></>;
 }
 
 function MissionView({ state, onClaim }: { state: GameState; onClaim: (id: string) => void }) {

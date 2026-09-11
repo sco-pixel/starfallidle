@@ -519,11 +519,35 @@ h3 { font-size: 1rem; }
 .notice { margin-bottom: 10px; padding: 12px 14px; color: #c7b06f; font-size: .78rem; }
 .faction-strip .allied { border-color: #c7953d; background: #c7953d0c; }
 .faction-strip button { margin-top: 8px; width: 100%; height: 30px; font-size: .64rem; }
+.outpost-overview { margin-bottom: 10px; padding: 17px; display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; border-color: #54472f; }
+.outpost-overview h2 { margin-top: 4px; }
+.outpost-overview p:not(.eyebrow) { margin-top: 5px; color: #8998a7; font-size: .82rem; }
+.outpost-resources { max-width: 430px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.outpost-resources span { min-height: 29px; padding: 5px 8px; border: 1px solid #334252; display: inline-flex; align-items: center; gap: 5px; color: #aab6c1; font: .68rem var(--font-mono); background: #0d151e; }
+.outpost-resources svg { width: 13px; color: #d5a247; }
+.outpost-list { display: grid; gap: 9px; }
 .outpost-card { padding: 16px; display: grid; grid-template-columns: 40px 1fr; gap: 12px; }
+.outpost-card.current { border-color: #8a6930; box-shadow: inset 3px 0 #d4a247; }
 .outpost-card > span { width: 38px; height: 38px; border: 1px solid #405061; display: grid; place-items: center; color: #d7a84f; }
 .outpost-card h3 { margin-top: 3px; }
-.outpost-card p:not(.eyebrow) { margin-top: 5px; color: #8998a7; font-size: .76rem; }
-.outpost-actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.outpost-card p:not(.eyebrow) { margin-top: 5px; color: #8998a7; font-size: .78rem; }
+.outpost-card-body { min-width: 0; }
+.outpost-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.outpost-heading > b { padding: 4px 7px; border: 1px solid #46576a; color: #b9c4ce; font: .67rem var(--font-mono); white-space: nowrap; }
+.outpost-bonus { color: #6fc29f !important; }
+.outpost-card [data-slot="progress"] { height: 5px; margin-top: 9px; background: #1c2733; }
+.outpost-card [data-slot="progress"] > div { background: #67b99d; }
+.outpost-options { margin-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.outpost-options > section { padding: 11px; border: 1px solid #2e3d4c; display: grid; grid-template-rows: auto 1fr auto auto; gap: 7px; background: #0b131c; }
+.outpost-options > section.selected { border-color: #a17b37; background: #c6953a0a; }
+.outpost-options > section > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.outpost-options strong { font-size: .84rem; }
+.outpost-options em { color: #e0ad4e; font: 700 .61rem var(--font-mono); letter-spacing: .08em; font-style: normal; }
+.outpost-options p { margin: 0 !important; min-height: 42px; }
+.outpost-options small { color: #bda363; font: .66rem/1.35 var(--font-mono); }
+.outpost-options button { width: 100%; min-height: 38px; height: auto; padding: 7px 9px; border-radius: 0; white-space: normal; line-height: 1.25; }
+.outpost-remote { margin-top: 12px; padding: 9px 11px; border: 1px dashed #334252; display: flex; align-items: center; gap: 8px; color: #788695; font-size: .75rem; }
+.outpost-remote svg { width: 16px; }
 .collection-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .collection-title span { color: #d9aa52; font: .75rem var(--font-mono); }
 .collection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
@@ -603,6 +627,12 @@ h3 { font-size: 1rem; }
   .sector-card { grid-template-columns: 36px 1fr; }
   .sector-card button { grid-column: 1 / -1; width: 100%; }
   .module-grid, .crew-grid { grid-template-columns: 1fr; }
+  .outpost-overview { grid-template-columns: 1fr; }
+  .outpost-resources { justify-content: flex-start; }
+  .outpost-card { grid-template-columns: 32px 1fr; padding: 13px; }
+  .outpost-card > span { width: 31px; height: 31px; }
+  .outpost-options { grid-template-columns: 1fr; }
+  .outpost-options p { min-height: 0; }
   .power-intro { grid-template-columns: 1fr; gap: 12px; padding: 15px; }
   .power-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .power-options button { min-height: 124px; }
