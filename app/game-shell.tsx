@@ -799,10 +799,10 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
   return (
     <>
       <header className="site-header">
-        <div className="brand-lockup">
+        <button className="brand-lockup" type="button" onClick={() => { setSelectedSkill(state.activeTask.skillId); openView("skills"); }} aria-label="Return to the Starfall Idle home screen">
           <span className="brand-mark" aria-hidden="true"><Orbit /></span>
-          <div><p className="eyebrow">SECTOR // EREBUS</p><h1>Starfall Idle</h1></div>
-        </div>
+          <div><p className="eyebrow">SECTOR // {activeSector.name.toUpperCase()}</p><h1>Starfall Idle</h1></div>
+        </button>
         <div className="account-area">
           <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
           {signedIn
@@ -914,7 +914,8 @@ function ShipView({ state, onUpgrade, onPowerMode }: { state: GameState; onUpgra
     { id: "research", name: "Research", effect: "12% faster scientific and medical skills" }, { id: "combat", name: "Combat", effect: "12% faster vessel encounters" },
     { id: "navigation", name: "Navigation", effect: "12% faster Astrogation, Logistics and Diplomacy" },
   ];
-  return <><section className="power-grid panel"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Redirect the Aethelgard reactor toward the systems needed for your current plan.</p></div>{modes.map((mode) => <button key={mode.id} className={state.powerMode === mode.id ? "selected" : ""} onClick={() => onPowerMode(mode.id)}><Zap /><strong>{mode.name}</strong><small>{mode.effect}</small></button>)}</section><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div></>;
+  const activeMode = modes.find((mode) => mode.id === state.powerMode) ?? modes[0];
+  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div></>;
 }
 
 function CrewView({ state, onAssign }: { state: GameState; onAssign: (id: string, skill: SkillId) => void }) {
