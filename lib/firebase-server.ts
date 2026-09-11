@@ -13,7 +13,7 @@ export type FirebaseIdentity = {
 };
 
 export async function getFirebaseIdentity(request: Request): Promise<FirebaseIdentity | null> {
-  const token = request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "");
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return null;
 
   try {
