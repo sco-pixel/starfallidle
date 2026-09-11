@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { signInWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import {
   Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
@@ -43,6 +43,7 @@ declare global {
 type SaveStatus = "guest" | "saved" | "saving" | "error";
 type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "missions" | "hiscores";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
+type FirebaseSession = { userId: string; email: string | null; displayName: string | null; state: GameState; hasCloudSave: boolean };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
 const sectorById = Object.fromEntries(sectors.map((entry) => [entry.id, entry]));
@@ -467,12 +468,20 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const [offlineReport, setOfflineReport] = useState<OfflineReport | null>(null);
   const [guestImport, setGuestImport] = useState<GameState | null>(null);
   const [firebaseLink, setFirebaseLink] = useState<{ status: "idle" | "linking" | "linked" | "error"; message: string }>({ status: "idle", message: "" });
+  const [firebaseSession, setFirebaseSession] = useState<FirebaseSession | null>(null);
+  const [firebaseAuthStatus, setFirebaseAuthStatus] = useState<"idle" | "connecting" | "loading" | "unlinked" | "error">("idle");
   const [now, setNow] = useState(initialState.lastActiveAt);
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSave = useRef(false);
   const cloudSaveEnabled = useRef(!signedIn);
+  const firebaseCloudActive = !signedIn && Boolean(firebaseSession);
+  const cloudSignedIn = signedIn || firebaseCloudActive;
+  const cloudSaveAvailable = signedIn ? saveAvailable : firebaseCloudActive;
+  const activeAccountId = signedIn ? accountId : firebaseSession?.userId ?? null;
+  const activeAccountName = signedIn ? accountName : firebaseSession?.displayName ?? firebaseSession?.email ?? "Google commander";
+  const activeAccountEmail = signedIn ? accountEmail : firebaseSession?.email ?? null;
   useEffect(() => { stateRef.current = state; }, [state]);
 
   const linkGoogleAccount = useCallback(async () => {
@@ -497,26 +506,85 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     }
   }, [signedIn]);
 
+  const signInWithGoogle = useCallback(async () => {
+    setFirebaseAuthStatus("connecting");
+    try {
+      await signInWithPopup(firebaseAuth, firebaseGoogleProvider);
+    } catch {
+      setFirebaseAuthStatus("error");
+    }
+  }, []);
+
+  const signOutGoogle = useCallback(async () => {
+    await signOut(firebaseAuth);
+    setFirebaseSession(null);
+    setFirebaseAuthStatus("idle");
+    window.location.reload();
+  }, []);
+
+  useEffect(() => {
+    if (signedIn) return;
+    return onAuthStateChanged(firebaseAuth, (user) => {
+      if (!user) {
+        setFirebaseSession(null);
+        return;
+      }
+      setFirebaseAuthStatus("loading");
+      void (async () => {
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch("/api/firebase/save", { headers: { authorization: "Bearer " + token } });
+          const payload = await response.json() as {
+            error?: string;
+            exists?: boolean;
+            state?: GameState;
+            account?: { userId: string; email: string | null; displayName: string | null };
+          };
+          if (!response.ok || !payload.account || !payload.state) {
+            setFirebaseSession(null);
+            setFirebaseAuthStatus("unlinked");
+            return;
+          }
+          cloudSaveEnabled.current = false;
+          setFirebaseSession({
+            userId: payload.account.userId,
+            email: payload.account.email ?? user.email,
+            displayName: payload.account.displayName ?? user.displayName,
+            state: sanitizeGameState(payload.state),
+            hasCloudSave: Boolean(payload.exists),
+          });
+          setFirebaseAuthStatus("idle");
+        } catch {
+          setFirebaseAuthStatus("error");
+        }
+      })();
+    });
+  }, [signedIn]);
+
   const persist = useCallback(async (next: GameState) => {
-    if (!signedIn || !saveAvailable || !cloudSaveEnabled.current) return;
+    if (!cloudSignedIn || !cloudSaveAvailable || !cloudSaveEnabled.current) return;
     setSaveStatus("saving");
     try {
-      const response = await fetch("/api/save", {
-        method: "POST", headers: { "content-type": "application/json" },
+      const firebaseUser = signedIn ? null : firebaseAuth.currentUser;
+      const firebaseToken = firebaseUser ? await firebaseUser.getIdToken() : null;
+      if (!signedIn && !firebaseToken) throw new Error("Google session unavailable");
+      const response = await fetch(signedIn ? "/api/save" : "/api/firebase/save", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(firebaseToken ? { authorization: "Bearer " + firebaseToken } : {}) },
         body: JSON.stringify({ ...next, lastActiveAt: Date.now() }), keepalive: true,
       });
       if (!response.ok) throw new Error("Save failed");
       pendingSave.current = false;
       setSaveStatus("saved");
     } catch { setSaveStatus("error"); }
-  }, [saveAvailable, signedIn]);
+  }, [cloudSaveAvailable, cloudSignedIn, signedIn]);
 
   const queueSave = useCallback((next: GameState) => {
-    if (!signedIn || !saveAvailable) return;
+    if (!cloudSignedIn || !cloudSaveAvailable) return;
     pendingSave.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => void persist(next), 700);
-  }, [persist, saveAvailable, signedIn]);
+  }, [cloudSaveAvailable, cloudSignedIn, persist]);
 
   const updateState = useCallback((updater: (current: GameState) => GameState) => {
     setState((current) => {
@@ -529,19 +597,20 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydration imports browser-only guest state into the live game. */
   useEffect(() => {
-    let base = initialState;
-    if (!signedIn) {
+    let base = signedIn ? initialState : firebaseSession?.state ?? initialState;
+    if (!cloudSignedIn) {
       try {
         const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v5") ?? localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
         if (parsed) base = sanitizeGameState(parsed);
       } catch {}
     } else {
-      const marker = accountId ? `starfall-idle-guest-import-v1:${accountId}` : null;
+      const marker = activeAccountId ? `starfall-idle-guest-import-v1:${activeAccountId}` : null;
       try {
         const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v5") ?? localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
         const candidate = parsed ? sanitizeGameState(parsed) : null;
         if (candidate && hasMeaningfulGuestProgress(candidate) && marker && !localStorage.getItem(marker)) {
           // The prompt intentionally blocks cloud writes until the player chooses a save.
+          cloudSaveEnabled.current = false;
           setGuestImport(candidate);
         } else cloudSaveEnabled.current = true;
       } catch { cloudSaveEnabled.current = true; }
@@ -555,11 +624,11 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     setOfflineReport(result.report);
     setHydrated(true);
     if (result.report) queueSave(result.state);
-  }, [accountId, initialState, queueSave, signedIn]);
+  }, [activeAccountId, cloudSignedIn, firebaseSession, initialState, queueSave, signedIn]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const resolveGuestImport = (useGuest: boolean) => {
-    const marker = accountId ? `starfall-idle-guest-import-v1:${accountId}` : null;
+    const marker = activeAccountId ? `starfall-idle-guest-import-v1:${activeAccountId}` : null;
     if (marker) {
       try { localStorage.setItem(marker, useGuest ? "imported" : "kept-cloud"); } catch {}
     }
@@ -577,14 +646,14 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   };
 
   useEffect(() => {
-    if (!hydrated || signedIn) return;
+    if (!hydrated || cloudSignedIn) return;
     const saveGuest = () => {
       try { localStorage.setItem("starfall-idle-save-v5", JSON.stringify({ ...stateRef.current, lastActiveAt: Date.now() })); } catch {}
     };
     const timer = setInterval(saveGuest, 3000);
     document.addEventListener("visibilitychange", saveGuest);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", saveGuest); saveGuest(); };
-  }, [hydrated, signedIn]);
+  }, [cloudSignedIn, hydrated]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -620,12 +689,12 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   }, [queueSave]);
 
   useEffect(() => {
-    if (!signedIn || !saveAvailable) return;
+    if (!cloudSignedIn || !cloudSaveAvailable) return;
     const timer = setInterval(() => { if (pendingSave.current) void persist(stateRef.current); }, 8000);
     const flush = () => { if (pendingSave.current) void persist(stateRef.current); };
     document.addEventListener("visibilitychange", flush);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", flush); };
-  }, [persist, saveAvailable, signedIn]);
+  }, [cloudSaveAvailable, cloudSignedIn, persist]);
 
   const startActivity = useCallback((activity: SkillActivity) => {
     const current = stateRef.current;
@@ -681,7 +750,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const xpStart = xpForLevel(selectedProgress.level);
   const xpEnd = selectedProgress.level === MAX_SKILL_LEVEL ? selectedProgress.xp : xpForLevel(selectedProgress.level + 1);
   const xpProgress = selectedProgress.level === MAX_SKILL_LEVEL ? 100 : (selectedProgress.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
-  const displayName = state.displayName || accountName;
+  const displayName = state.displayName || activeAccountName;
   const saveLabel = saveStatus === "saved" ? "Cloud save current" : saveStatus === "saving" ? "Saving patrol" : saveStatus === "error" ? "Cloud save interrupted" : "Saved on this device";
   const openView = (nextView: ViewId) => { setView(nextView); setMobileMenuOpen(false); };
 
@@ -879,9 +948,9 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
         </button>
         <div className="account-area">
           <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
-          {signedIn
+          {cloudSignedIn
             ? <><span className={`header-save-indicator ${saveStatus}`} role="status" aria-label={saveLabel} title={saveLabel}>{saveStatus === "saved" ? <ShieldCheck /> : <Cloud />}</span><button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button></>
-            : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+            : <div className="firebase-primary-login"><button className="sign-in-link" type="button" onClick={() => void signInWithGoogle()} disabled={firebaseAuthStatus === "connecting" || firebaseAuthStatus === "loading"}>{firebaseAuthStatus === "connecting" || firebaseAuthStatus === "loading" ? "Connecting Google…" : "Sign in with Google"}</button><a className="legacy-sign-in-link" href={signInPath} target="_top">Migrate ChatGPT save</a>{firebaseAuthStatus === "unlinked" ? <small>Google is not linked to a commander yet.</small> : firebaseAuthStatus === "error" ? <small>Google sign-in is unavailable. Please try again.</small> : null}</div>}
         </div>
       </header>
       <AlertDialog open={Boolean(guestImport)}>
@@ -942,7 +1011,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
         {view === "outposts" ? <OutpostView state={state} onDevelop={developOutpost} /> : null}
         {view === "missions" ? <MissionView state={state} onClaim={claimMission} /> : null}
         {view === "hiscores" ? <HiscoresView signedIn={signedIn} signInPath={signInPath} /> : null}
-        {view === "character" ? <CharacterView state={state} fallbackName={accountName} email={accountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} firebaseLink={firebaseLink} onLinkGoogle={() => void linkGoogleAccount()} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
+        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} email={activeAccountEmail} signedIn={cloudSignedIn} legacySignedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} firebaseLink={firebaseLink} onLinkGoogle={() => void linkGoogleAccount()} onSignInGoogle={() => void signInWithGoogle()} onSignOutGoogle={() => void signOutGoogle()} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
       </main>
 
       {view !== "hiscores" ? <aside className="status-column v3-status">
@@ -1271,7 +1340,7 @@ function HiscoresView({ signedIn, signInPath }: { signedIn: boolean; signInPath:
   </div>;
 }
 
-function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, firebaseLink, onLinkGoogle, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; firebaseLink: { status: "idle" | "linking" | "linked" | "error"; message: string }; onLinkGoogle: () => void; onSaveName: (name: string) => void }) {
+function CharacterView({ state, fallbackName, email, signedIn, legacySignedIn, signInPath, signOutPath, firebaseLink, onLinkGoogle, onSignInGoogle, onSignOutGoogle, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; legacySignedIn: boolean; signInPath: string; signOutPath: string; firebaseLink: { status: "idle" | "linking" | "linked" | "error"; message: string }; onLinkGoogle: () => void; onSignInGoogle: () => void; onSignOutGoogle: () => void; onSaveName: (name: string) => void }) {
   const [name, setName] = useState(state.displayName || fallbackName);
   const savedName = state.displayName || fallbackName;
   const initials = savedName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "SC";
@@ -1283,7 +1352,7 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
   return <div className="character-settings">
     <section className="character-card panel">
       <div className="character-emblem">{initials}</div>
-      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{signedIn ? "ChatGPT account linked · cloud save active" : "Guest profile · saved on this device"}</span></div>
+      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{legacySignedIn ? "Legacy ChatGPT session · cloud save active" : signedIn ? "Google account · cloud save active" : "Guest profile · saved on this device"}</span></div>
       <div className="character-record"><span>Patrol <b>{state.patrol}</b></span><span>Total level <b>{totalLevel(state)}</b></span><span>Operations <b>{fmt(state.totalActions)}</b></span></div>
     </section>
 
@@ -1297,13 +1366,13 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
     </section>
 
     <section className="settings-panel account-settings panel">
-      <div><p className="eyebrow">ACCOUNT</p><h2>{signedIn ? "ChatGPT account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in to carry this character and patrol progress between devices."}</p></div>
-      {signedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+      <div><p className="eyebrow">ACCOUNT</p><h2>{legacySignedIn ? "ChatGPT migration session" : signedIn ? "Google account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in with Google to carry this character and patrol progress between devices."}</p></div>
+      {legacySignedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : signedIn ? <Button type="button" variant="outline" onClick={onSignOutGoogle}>Sign out</Button> : <Button type="button" onClick={onSignInGoogle}>Sign in with Google</Button>}
     </section>
 
     <section className="settings-panel account-settings panel">
-      <div><p className="eyebrow">GOOGLE ACCOUNT</p><h2>Firebase sign-in</h2><p>{signedIn ? "Link Google while signed in to ChatGPT. It is attached to this exact commander save; XP, cargo and ranking history stay together." : "Sign in with ChatGPT first to link Google to your existing commander."}</p></div>
-      {signedIn ? <div className="firebase-link-action"><Button type="button" onClick={onLinkGoogle} disabled={firebaseLink.status === "linking" || firebaseLink.status === "linked"}>{firebaseLink.status === "linking" ? "Linking Google…" : firebaseLink.status === "linked" ? "Google linked" : "Link Google account"}</Button>{firebaseLink.message ? <small className={firebaseLink.status === "error" ? "firebase-link-error" : ""}>{firebaseLink.message}</small> : null}</div> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+      <div><p className="eyebrow">GOOGLE ACCOUNT</p><h2>Firebase sign-in</h2><p>{legacySignedIn ? "Link Google while signed in to ChatGPT. It is attached to this exact commander save; XP, cargo and ranking history stay together." : signedIn ? "Google is your primary Starfall sign-in." : "Use this one-time migration path only if you have an existing ChatGPT save."}</p></div>
+      {legacySignedIn ? <div className="firebase-link-action"><Button type="button" onClick={onLinkGoogle} disabled={firebaseLink.status === "linking" || firebaseLink.status === "linked"}>{firebaseLink.status === "linking" ? "Linking Google…" : firebaseLink.status === "linked" ? "Google linked" : "Link Google account"}</Button>{firebaseLink.message ? <small className={firebaseLink.status === "error" ? "firebase-link-error" : ""}>{firebaseLink.message}</small> : null}</div> : signedIn ? <small>Linked Google account active.</small> : <a className="sign-in-link" href={signInPath} target="_top">Migrate ChatGPT save</a>}
     </section>
   </div>;
 }
