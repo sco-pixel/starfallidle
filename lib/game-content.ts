@@ -1,4 +1,5 @@
 import type { DroneId, EquipmentId, GameState, ShipModuleId, SkillId, VehicleId } from "./game-state";
+import { advancedActivities, bossActivities } from "./depth-content";
 
 export type Activity = {
   id: string;
@@ -41,9 +42,15 @@ export const itemNames: Record<string, string> = {
   catalyst: "Bio-catalyst", navData: "Nav Data", droneParts: "Drone Parts", fuelRod: "Fuel Rods",
   artefact: "Ancient Artefacts",
   missiles: "Tactical Missiles",
+  titanium: "Titanium Ore", phaseCrystal: "Phase Crystals", darkMatter: "Dark Matter", quantumDust: "Quantum Dust",
+  neutronium: "Neutronium", quantumCircuit: "Quantum Circuits", ancientCore: "Ancient Cores", xenoFiber: "Xeno-fibre",
+  neuralGel: "Neural Gel", quantumParts: "Quantum Components", titaniumPlate: "Titanium Plating", quantumAlloy: "Quantum Alloy",
+  neutroniumPlate: "Neutronium Plating", singularityCore: "Singularity Cores", genesisCompound: "Genesis Compound",
+  voidData: "Void Data", commandToken: "Command Token", gearPhaseLance: "Phase Lance", gearLivingBulwark: "Living Bulwark",
+  gearChronoDrive: "Chrono Drive", gearFoundryHeart: "Foundry Heart", gearStarfallCrown: "Starfall Crown",
 };
 
-export const activities: Activity[] = [
+const coreActivities: Activity[] = [
   { id: "ferrite-outcrop", skillId: "mining", name: "Ferrite Outcrop", level: 1, seconds: 3, xp: 9, description: "Cut common hull-grade ore from a near-field rock.", produces: { ferrite: 3 }, collectionId: "ore-ferrite" },
   { id: "cobalt-seam", skillId: "mining", name: "Cobalt Seam", level: 5, seconds: 5, xp: 17, description: "Track blue seams used in compact power cells.", produces: { cobalt: 2 }, sectors: ["helix", "cinder", "orpheus", "silent"], collectionId: "ore-cobalt" },
   { id: "iridium-core", skillId: "mining", name: "Iridium Core", level: 12, seconds: 8, xp: 32, description: "Bore into a dense and unstable asteroid core.", produces: { ferrite: 5, iridium: 2 }, sectors: ["orpheus", "silent"], collectionId: "ore-iridium" },
@@ -144,6 +151,8 @@ export const activities: Activity[] = [
   { id: "sentinel-city", skillId: "archaeology", name: "Sentinel City Survey", level: 20, seconds: 16, xp: 72, description: "Map the cultural layers beneath an active machine metropolis.", consumes: { relic: 4, powerCell: 2 }, produces: { artefact: 2, data: 6 }, sectors: ["silent"] },
 ];
 
+export const activities: Activity[] = [...coreActivities, ...advancedActivities, ...bossActivities];
+
 export const sectors = [
   { id: "erebus", name: "Erebus Belt", level: 1, fuel: 0, tone: "Industrial frontier", description: "Safe shipping lanes, training rocks and crowded salvage fields." },
   { id: "helix", name: "Helix Reach", level: 10, fuel: 1, tone: "Research quarantine", description: "Abandoned laboratories and rapidly adapting xenoflora." },
@@ -204,6 +213,13 @@ export const researchNodes: { id: string; name: string; description: string; cos
   { id: "xeno-adaptation", name: "Xeno Adaptation", description: "Xenobotany and biochemistry gain bonus output.", cost: { data: 22, catalyst: 2 }, requires: ["efficient-cycles"] },
   { id: "phase-mapping", name: "Phase Mapping", description: "Travel costs one fewer Fuel Rod.", cost: { data: 30, relic: 3 }, requires: ["autonomous-repair"] },
   { id: "sentinel-protocol", name: "Sentinel Protocol", description: "Ancient enemies deal 20% less damage.", cost: { data: 45, artefact: 1 }, requires: ["phase-mapping", "xeno-adaptation"] },
+  { id: "titanium-printing", name: "Titanium Printing", description: "Industrial power produces one extra manufactured item.", cost: { data: 70, titanium: 15 }, requires: ["autonomous-repair"] },
+  { id: "neural-cultures", name: "Neural Cultures", description: "Crew gain experience 25% faster.", cost: { data: 90, neuralGel: 8 }, requires: ["xeno-adaptation"] },
+  { id: "quantum-logistics", name: "Quantum Logistics", description: "Production queues hold eight operations.", cost: { voidData: 30, quantumCircuit: 10 }, requires: ["phase-mapping"] },
+  { id: "boss-analysis", name: "Boss Analysis", description: "Sector bosses deal 15% less damage.", cost: { voidData: 45, ancientCore: 2 }, requires: ["sentinel-protocol"] },
+  { id: "outpost-network", name: "Outpost Network", description: "Outpost bonuses apply throughout their sector.", cost: { quantumCircuit: 18, titaniumPlate: 10 }, requires: ["titanium-printing"] },
+  { id: "singularity-theory", name: "Singularity Theory", description: "Unlock the highest tier of specialist operations.", cost: { voidData: 80, quantumDust: 30, ancientCore: 5 }, requires: ["boss-analysis", "outpost-network"] },
+  { id: "starfall-doctrine", name: "Starfall Doctrine", description: "Command Points improve all output by one per five points.", cost: { singularityCore: 2, commandToken: 1 }, requires: ["singularity-theory"] },
 ];
 
 export const contracts: { id: string; faction: string; name: string; description: string; cost: Record<string, number>; reward: { credits: number; reputation: number } }[] = [
@@ -220,6 +236,10 @@ export const expeditions: { id: string; name: string; minutes: number; level: nu
   { id: "uncharted-moon", name: "Survey the Uncharted Moon", minutes: 4, level: 18, description: "Deploy a rover beyond beacon range.", cost: { fuelRod: 1, rations: 4 }, reward: { cobalt: 8, catalyst: 3 }, collection: "expedition-moon", vehicle: "rover" },
   { id: "alien-structure", name: "Enter the Alien Structure", minutes: 7, level: 38, description: "Take a multidisciplinary team below the surface.", cost: { powerCell: 2, medicine: 3, data: 8 }, reward: { relic: 8, artefact: 1 }, collection: "expedition-structure", vehicle: "boardingShuttle" },
   { id: "jump-gate", name: "Repair the Broken Gate", minutes: 10, level: 60, description: "Restore a pre-collapse transit gate.", cost: { plating: 8, circuits: 8, fuelRod: 3 }, reward: { artefact: 3, navData: 15 }, collection: "expedition-gate", vehicle: "boardingShuttle" },
+  { id: "phase-storm", name: "Cross the Phase Storm", minutes: 14, level: 180, description: "Escort a science team through a repeating spatial front.", cost: { fuelRod: 4, medicine: 5, phaseCrystal: 3 }, reward: { voidData: 12, quantumDust: 8 }, collection: "expedition-storm", vehicle: "boardingShuttle" },
+  { id: "bioship-remains", name: "Enter the Bio-Ship", minutes: 18, level: 320, description: "Recover living technology after a successful containment battle.", cost: { medicine: 8, neuralGel: 4, powerCell: 5 }, reward: { xenoFiber: 18, genesisCompound: 4 }, collection: "expedition-bioship", vehicle: "boardingShuttle" },
+  { id: "sentinel-foundry", name: "Raid the Foundry Interior", minutes: 24, level: 600, description: "Send a boarding team into an active machine production line.", cost: { neutroniumPlate: 3, medicine: 10, missiles: 15 }, reward: { ancientCore: 6, quantumParts: 15 }, collection: "expedition-foundry", vehicle: "boardingShuttle" },
+  { id: "machine-core", name: "Descend into the Machine Core", minutes: 35, level: 1000, description: "Reach the intelligence chamber beneath the Silent Systems.", cost: { singularityCore: 1, genesisCompound: 5, fuelRod: 10 }, reward: { commandToken: 1, voidData: 50 }, collection: "expedition-core", vehicle: "boardingShuttle" },
 ];
 
 export const storyEvents = {
@@ -249,6 +269,10 @@ export const collectionEntries = [
   ["enemy-scavenger", "Scavenger Drone", "Hostiles"], ["enemy-automata", "Helix Automata", "Hostiles"], ["enemy-corsair", "Corsair Skiff", "Hostiles"], ["enemy-frigate", "Corsair Frigate", "Hostiles"], ["enemy-sentinel", "Void Sentinel", "Hostiles"], ["enemy-dreadnought", "Silent Dreadnought", "Hostiles"],
   ["ruin-colony", "Colony Tablet", "Relics"], ["ruin-vault", "Vault Mechanism", "Relics"], ["expedition-structure", "Structure Survey", "Expeditions"],
   ["expedition-gate", "Restored Jump Gate", "Expeditions"], ["chart-rift", "Rift Chart", "Navigation"], ["accord-corsair", "Corsair Accord", "Diplomacy"],
+  ["boss-carrier", "Corsair Carrier Wreck", "Bosses"], ["boss-bioship", "Contained Bio-Ship", "Bosses"], ["boss-leviathan", "Leviathan Echo", "Bosses"],
+  ["boss-foundry", "Disabled Sentinel Foundry", "Bosses"], ["boss-core", "Machine Intelligence Core", "Bosses"],
+  ["expedition-storm", "Phase Storm Crossing", "Expeditions"], ["expedition-bioship", "Bio-Ship Interior", "Expeditions"],
+  ["expedition-foundry", "Foundry Interior", "Expeditions"], ["expedition-core", "Core Descent", "Expeditions"],
 ] as const;
 
 export function totalLevel(state: GameState) {

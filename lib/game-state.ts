@@ -13,6 +13,11 @@ export type DroneId = "mining" | "salvage" | "survey" | "combat" | "cargo";
 export type VehicleId = "rover" | "boardingShuttle";
 export type CombatWeapon = "laser" | "railgun" | "missile";
 export type CombatStance = "balanced" | "aggressive" | "defensive";
+export type PowerMode = "balanced" | "industrial" | "research" | "combat" | "navigation";
+export type ResearchPath = "industrial" | "exploration" | "military" | "xenotechnology";
+export type StatusEffect = "radiation" | "hullBreach" | "sensorDisruption" | "overheating";
+export type OutpostType = "mining" | "research" | "trade";
+export type CombatLoadout = { weapon: CombatWeapon; stance: CombatStance; retreatAt: number };
 export type CombatState = {
   weapon: CombatWeapon;
   stance: CombatStance;
@@ -25,11 +30,13 @@ export type CombatState = {
 };
 
 export type GameState = {
-  version: 4;
+  version: 5;
   displayName: string;
   credits: number;
   skills: Record<SkillId, SkillProgress>;
   mastery: Record<SkillId, number>;
+  operationMastery: Record<string, number>;
+  operationCounts: Record<string, number>;
   inventory: Record<string, number>;
   equipment: Record<EquipmentId, number>;
   activeTask: ActiveTask;
@@ -40,13 +47,21 @@ export type GameState = {
   sectorId: string;
   shipModules: Record<ShipModuleId, number>;
   crewAssignments: Record<string, SkillId>;
+  crewXp: Record<string, number>;
+  crewLoyalty: Record<string, number>;
   crewMorale: number;
+  powerMode: PowerMode;
+  outposts: Record<string, { type: OutpostType; level: number }>;
   drones: Record<DroneId, number>;
   vehicles: Record<VehicleId, number>;
   researchUnlocked: string[];
+  researchPath: ResearchPath | null;
+  productionQueue: { activityId: string; remaining: number }[];
   collection: string[];
   factions: Record<string, number>;
   contractsCompleted: string[];
+  factionAlly: string | null;
+  missionsCompleted: string[];
   activeExpedition: { id: string; endsAt: number } | null;
   completedExpeditions: number;
   patrol: number;
@@ -56,6 +71,9 @@ export type GameState = {
   maxHull: number;
   shields: number;
   retreatAt: number;
+  equippedGear: string | null;
+  combatLoadouts: Record<"alpha" | "beta", CombatLoadout>;
+  statusEffects: StatusEffect[];
   combat: CombatState;
   storyLog: string[];
   pendingEvent: string | null;
@@ -65,6 +83,11 @@ const startingInventory: Record<string, number> = {
   ferrite: 12, cobalt: 0, iridium: 0, salvage: 8, circuits: 2, algae: 0,
   rations: 4, plating: 0, powerCell: 2, data: 0, relic: 0, medicine: 2,
   catalyst: 0, navData: 0, droneParts: 0, fuelRod: 2, artefact: 0, missiles: 6,
+  titanium: 0, phaseCrystal: 0, darkMatter: 0, quantumDust: 0, neutronium: 0,
+  quantumCircuit: 0, ancientCore: 0, xenoFiber: 0, neuralGel: 0, quantumParts: 0,
+  titaniumPlate: 0, quantumAlloy: 0, neutroniumPlate: 0, singularityCore: 0,
+  genesisCompound: 0, voidData: 0, commandToken: 0,
+  gearPhaseLance: 0, gearLivingBulwark: 0, gearChronoDrive: 0, gearFoundryHeart: 0, gearStarfallCrown: 0,
 };
 
 export const MAX_SKILL_LEVEL = 100;
@@ -119,11 +142,13 @@ export function defaultGameState(): GameState {
   const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, { xp: 0, level: 1 }])) as Record<SkillId, SkillProgress>;
   const mastery = Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>;
   return {
-    version: 4,
+    version: 5,
     displayName: "",
     credits: 180,
     skills,
     mastery,
+    operationMastery: {},
+    operationCounts: {},
     inventory: { ...startingInventory },
     equipment: { cutter: 1, exosuit: 1, scanner: 1, railgun: 1, shield: 1 },
     activeTask: { skillId: "mining", activityId: "ferrite-outcrop" },
@@ -137,13 +162,21 @@ export function defaultGameState(): GameState {
       mara: "astrogation", jonas: "engineering", priya: "science", okafor: "medicine", sol: "combat",
       mei: "botany", rook: "drones", elias: "logistics", vega: "salvage", anya: "archaeology",
     },
+    crewXp: { mara: 0, jonas: 0, priya: 0, okafor: 0, sol: 0, mei: 0, rook: 0, elias: 0, vega: 0, anya: 0 },
+    crewLoyalty: { mara: 50, jonas: 50, priya: 50, okafor: 50, sol: 50, mei: 50, rook: 50, elias: 50, vega: 50, anya: 50 },
     crewMorale: 80,
+    powerMode: "balanced",
+    outposts: {},
     drones: { mining: 0, salvage: 0, survey: 0, combat: 0, cargo: 0 },
     vehicles: { rover: 0, boardingShuttle: 0 },
     researchUnlocked: [],
+    researchPath: null,
+    productionQueue: [],
     collection: [],
     factions: { patrol: 0, prospectors: 0, institute: 0, frontier: 0, corsairs: 0 },
     contractsCompleted: [],
+    factionAlly: null,
+    missionsCompleted: [],
     activeExpedition: null,
     completedExpeditions: 0,
     patrol: 1,
@@ -153,6 +186,12 @@ export function defaultGameState(): GameState {
     maxHull: 100,
     shields: 40,
     retreatAt: 25,
+    equippedGear: null,
+    combatLoadouts: {
+      alpha: { weapon: "laser", stance: "balanced", retreatAt: 25 },
+      beta: { weapon: "railgun", stance: "defensive", retreatAt: 40 },
+    },
+    statusEffects: [],
     combat: { weapon: "laser", stance: "balanced", activeTaskId: null, progress: 0, victories: {}, streak: 0, bestStreak: 0, lastLoot: null },
     storyLog: ["Patrol 01 commissioned at Erebus Station."],
     pendingEvent: null,
@@ -174,6 +213,11 @@ function numericRecord<T extends string>(value: unknown, defaults: Record<T, num
   return Object.fromEntries(Object.entries(defaults).map(([key, fallback]) => [key, boundedNumber(input[key], fallback as number, max)])) as Record<T, number>;
 }
 
+function looseNumericRecord(value: unknown, max = 10_000_000) {
+  const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return Object.fromEntries(Object.entries(input).filter(([key]) => key.length < 100).slice(0, 500).map(([key, amount]) => [key, boundedNumber(amount, 0, max)]));
+}
+
 export function sanitizeGameState(value: unknown): GameState {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const defaults = defaultGameState();
@@ -186,7 +230,9 @@ export function sanitizeGameState(value: unknown): GameState {
   const expeditionInput = input.activeExpedition && typeof input.activeExpedition === "object" ? input.activeExpedition as Record<string, unknown> : null;
   const combatInput = input.combat && typeof input.combat === "object" ? input.combat as Record<string, unknown> : {};
   const victoriesInput = combatInput.victories && typeof combatInput.victories === "object" ? combatInput.victories as Record<string, unknown> : {};
-  const saveVersion = boundedNumber(input.version, 0, 4);
+  const saveVersion = boundedNumber(input.version, 0, 5);
+  const outpostsInput = input.outposts && typeof input.outposts === "object" ? input.outposts as Record<string, unknown> : {};
+  const loadoutsInput = input.combatLoadouts && typeof input.combatLoadouts === "object" ? input.combatLoadouts as Record<string, unknown> : {};
 
   const skills = Object.fromEntries(SKILL_IDS.map((id) => {
     const raw = skillsInput[id] && typeof skillsInput[id] === "object" ? skillsInput[id] as Record<string, unknown> : {};
@@ -205,11 +251,13 @@ export function sanitizeGameState(value: unknown): GameState {
   const skillId: SkillId = rawSkillId === "combat" ? "mining" : rawSkillId;
 
   return {
-    version: 4,
+    version: 5,
     displayName: typeof input.displayName === "string" ? input.displayName.trim().slice(0, 32) : "",
     credits: boundedNumber(input.credits, defaults.credits),
     skills,
     mastery,
+    operationMastery: looseNumericRecord(input.operationMastery, 100),
+    operationCounts: looseNumericRecord(input.operationCounts),
     inventory,
     equipment: {
       cutter: Math.max(1, boundedNumber(equipmentInput.cutter, 1, 100)),
@@ -234,13 +282,25 @@ export function sanitizeGameState(value: unknown): GameState {
         ? Object.fromEntries(Object.entries(input.crewAssignments as Record<string, unknown>).filter(([, id]) => SKILL_IDS.includes(id as SkillId))) as Record<string, SkillId>
         : {}),
     },
+    crewXp: numericRecord(input.crewXp, defaults.crewXp, 10_000_000),
+    crewLoyalty: numericRecord(input.crewLoyalty, defaults.crewLoyalty, 100),
     crewMorale: boundedNumber(input.crewMorale, defaults.crewMorale, 100),
+    powerMode: ["balanced", "industrial", "research", "combat", "navigation"].includes(String(input.powerMode)) ? input.powerMode as PowerMode : "balanced",
+    outposts: Object.fromEntries(Object.entries(outpostsInput).filter(([sectorId, value]) => ["erebus", "helix", "cinder", "orpheus", "silent"].includes(sectorId) && value && typeof value === "object").map(([sectorId, value]) => {
+      const raw = value as Record<string, unknown>;
+      const type = ["mining", "research", "trade"].includes(String(raw.type)) ? raw.type as OutpostType : "mining";
+      return [sectorId, { type, level: Math.max(1, boundedNumber(raw.level, 1, 10)) }];
+    })),
     drones: numericRecord(input.drones, defaults.drones, 100),
     vehicles: numericRecord(input.vehicles, defaults.vehicles, 20),
     researchUnlocked: stringList(input.researchUnlocked),
+    researchPath: ["industrial", "exploration", "military", "xenotechnology"].includes(String(input.researchPath)) ? input.researchPath as ResearchPath : null,
+    productionQueue: Array.isArray(input.productionQueue) ? input.productionQueue.filter((entry) => entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).activityId === "string").slice(0, 8).map((entry) => ({ activityId: String((entry as Record<string, unknown>).activityId).slice(0, 80), remaining: Math.max(1, boundedNumber((entry as Record<string, unknown>).remaining, 25, 1000)) })) : [],
     collection: stringList(input.collection, 500),
     factions: numericRecord(input.factions, defaults.factions, 100),
     contractsCompleted: stringList(input.contractsCompleted, 500),
+    factionAlly: typeof input.factionAlly === "string" && ["patrol", "prospectors", "institute", "frontier", "corsairs"].includes(input.factionAlly) ? input.factionAlly : null,
+    missionsCompleted: stringList(input.missionsCompleted, 100),
     activeExpedition: expeditionInput && typeof expeditionInput.id === "string"
       ? { id: expeditionInput.id.slice(0, 60), endsAt: boundedNumber(expeditionInput.endsAt, Date.now(), Date.now() + 7 * 86_400_000) }
       : null,
@@ -252,6 +312,14 @@ export function sanitizeGameState(value: unknown): GameState {
     maxHull: Math.max(1, boundedNumber(input.maxHull, defaults.maxHull, 100_000)),
     shields: boundedNumber(input.shields, defaults.shields, 100_000),
     retreatAt: boundedNumber(input.retreatAt, defaults.retreatAt, 90),
+    equippedGear: typeof input.equippedGear === "string" ? input.equippedGear.slice(0, 80) : null,
+    combatLoadouts: Object.fromEntries((["alpha", "beta"] as const).map((slot) => {
+      const raw = loadoutsInput[slot] && typeof loadoutsInput[slot] === "object" ? loadoutsInput[slot] as Record<string, unknown> : defaults.combatLoadouts[slot];
+      const weapon = ["laser", "railgun", "missile"].includes(String(raw.weapon)) ? raw.weapon as CombatWeapon : defaults.combatLoadouts[slot].weapon;
+      const stance = ["balanced", "aggressive", "defensive"].includes(String(raw.stance)) ? raw.stance as CombatStance : defaults.combatLoadouts[slot].stance;
+      return [slot, { weapon, stance, retreatAt: boundedNumber(raw.retreatAt, defaults.combatLoadouts[slot].retreatAt, 90) }];
+    })) as Record<"alpha" | "beta", CombatLoadout>,
+    statusEffects: stringList(input.statusEffects, 4).filter((effect): effect is StatusEffect => ["radiation", "hullBreach", "sensorDisruption", "overheating"].includes(effect)),
     combat: {
       weapon: ["laser", "railgun", "missile"].includes(String(combatInput.weapon)) ? combatInput.weapon as CombatWeapon : "laser",
       stance: ["balanced", "aggressive", "defensive"].includes(String(combatInput.stance)) ? combatInput.stance as CombatStance : "balanced",

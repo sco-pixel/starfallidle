@@ -169,6 +169,10 @@ h3 { font-size: 1rem; }
 .xp-block [data-slot="progress"] { height: 5px; margin-top: 9px; background: #1c2733; }
 .xp-block [data-slot="progress"] > div { background: #65b4c9; }
 .activity-list { display: grid; gap: 8px; }
+.production-queue { margin-bottom: 10px; padding: 14px; display: grid; grid-template-columns: 1fr minmax(180px, .7fr) auto; gap: 14px; align-items: center; border-color: #4b4935; }
+.production-queue h2 { margin-top: 3px; }
+.production-queue p:not(.eyebrow) { margin-top: 4px; color: #82909e; font-size: .76rem; }
+.production-queue > div:nth-child(2) { display: grid; gap: 3px; color: #baa164; font: .68rem var(--font-mono); }
 .activity-row {
   min-height: 104px; padding: 14px; display: grid; grid-template-columns: 54px 1fr 110px; align-items: center;
   gap: 14px; color: inherit; text-align: left; cursor: pointer; transition: border-color .15s, transform .15s, background .15s;
@@ -176,6 +180,8 @@ h3 { font-size: 1rem; }
 .activity-row:hover:not(:disabled) { border-color: #536579; transform: translateY(-1px); }
 .activity-row.running { border-color: #d9a849; background: linear-gradient(90deg, #2c2416aa, #101923); }
 .activity-row:disabled { opacity: .48; cursor: not-allowed; }
+.activity-action > div { margin-top: 7px; display: grid; gap: 5px; }
+.mastery-line { display: block; margin-top: 5px; color: #6eb8a0; font: .65rem var(--font-mono); }
 .activity-level { height: 54px; border-right: 1px solid #2a3745; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; }
 .activity-level svg { width: 17px; color: #d7a84f; }
 .activity-level b { color: #94a1af; font: 700 .7rem var(--font-mono); }
@@ -472,6 +478,24 @@ h3 { font-size: 1rem; }
 .research-node button { min-width: 110px; border-radius: 0; }
 
 .collection-groups { display: grid; gap: 20px; }
+.depth-panel { margin-bottom: 12px; padding: 17px; display: grid; gap: 15px; }
+.depth-panel h2 { margin-top: 4px; }
+.depth-panel p:not(.eyebrow) { margin-top: 5px; color: #8998a7; font-size: .8rem; }
+.loadout-grid, .effect-grid, .path-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.loadout-grid article, .effect-grid article { padding: 11px; border: 1px solid #2c3b4a; display: grid; gap: 7px; }
+.loadout-grid article > span, .effect-grid article > span { color: #8e9ca9; font-size: .72rem; }
+.loadout-grid article > div { display: flex; gap: 6px; }
+.path-grid button { min-height: 68px; height: auto; padding: 10px; display: grid; justify-items: start; text-align: left; }
+.path-grid button span { text-transform: capitalize; }
+.path-grid button small { white-space: normal; opacity: .75; }
+.notice { margin-bottom: 10px; padding: 12px 14px; color: #c7b06f; font-size: .78rem; }
+.faction-strip .allied { border-color: #c7953d; background: #c7953d0c; }
+.faction-strip button { margin-top: 8px; width: 100%; height: 30px; font-size: .64rem; }
+.outpost-card { padding: 16px; display: grid; grid-template-columns: 40px 1fr; gap: 12px; }
+.outpost-card > span { width: 38px; height: 38px; border: 1px solid #405061; display: grid; place-items: center; color: #d7a84f; }
+.outpost-card h3 { margin-top: 3px; }
+.outpost-card p:not(.eyebrow) { margin-top: 5px; color: #8998a7; font-size: .76rem; }
+.outpost-actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 .collection-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .collection-title span { color: #d9aa52; font: .75rem var(--font-mono); }
 .collection-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
@@ -550,6 +574,8 @@ h3 { font-size: 1rem; }
   .sector-card { grid-template-columns: 36px 1fr; }
   .sector-card button { grid-column: 1 / -1; width: 100%; }
   .module-grid, .crew-grid { grid-template-columns: 1fr; }
+  .production-queue { grid-template-columns: 1fr; }
+  .loadout-grid, .effect-grid, .path-grid { grid-template-columns: 1fr; }
   .combat-summary { grid-template-columns: 1fr; }
   .combat-operation, .combat-control, .combat-targets, .combat-milestones { grid-template-columns: 1fr; }
   .combat-control .retreat-control { grid-column: 1; }
