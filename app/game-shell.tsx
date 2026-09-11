@@ -5,9 +5,9 @@ import {
   Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
   Hammer, HeartPulse, History, Landmark, LockKeyhole, Map, Medal, Orbit,
-  PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Shield,
+  Menu, PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Shield,
   ShieldCheck, Sparkles, Star, Target, Telescope, TrendingUp, Trophy,
-  UserRound, Users, Wrench, Zap,
+  UserRound, Users, Wrench, X, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -341,6 +341,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
   const [view, setView] = useState<ViewId>("skills");
   const [selectedSkill, setSelectedSkill] = useState<SkillId>(initialState.activeTask.skillId);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(signedIn && saveAvailable ? "saved" : signedIn ? "error" : "guest");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [offlineReport, setOfflineReport] = useState<OfflineReport | null>(null);
   const [now, setNow] = useState(initialState.lastActiveAt);
   const [hydrated, setHydrated] = useState(false);
@@ -496,6 +497,8 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
   const xpEnd = selectedProgress.level === MAX_SKILL_LEVEL ? selectedProgress.xp : xpForLevel(selectedProgress.level + 1);
   const xpProgress = selectedProgress.level === MAX_SKILL_LEVEL ? 100 : (selectedProgress.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
   const displayName = state.displayName || accountName;
+  const saveLabel = saveStatus === "saved" ? "Cloud save current" : saveStatus === "saving" ? "Saving patrol" : saveStatus === "error" ? "Cloud save interrupted" : "Saved on this device";
+  const openView = (nextView: ViewId) => { setView(nextView); setMobileMenuOpen(false); };
 
   const travel = (sectorId: string) => updateState((current) => {
     const destination = sectorById[sectorId];
@@ -650,21 +653,21 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
         <div className="account-area">
           <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
           {signedIn
-            ? <button className="account-link" onClick={() => setView("character")}><UserRound /> Character</button>
+            ? <><span className={`header-save-indicator ${saveStatus}`} role="status" aria-label={saveLabel} title={saveLabel}>{saveStatus === "saved" ? <ShieldCheck /> : <Cloud />}</span><button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button></>
             : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
         </div>
       </header>
-    <div className="game-layout v3">
-      <aside className="command-nav panel">
-        <button className={`home-button ${view === "skills" ? "selected" : ""}`} onClick={() => setView("skills")}><Activity /><span><strong>Skill Matrix</strong><small>TL {totalLevel(state)}</small></span></button>
+    <div className={`game-layout v3 ${view === "skills" ? "with-skill-nav" : "without-skill-nav"}`}>
+      {view === "skills" ? <aside className="command-nav panel">
+        <button className="home-button selected" onClick={() => setView("skills")}><Activity /><span><strong>Skill Matrix</strong><small>TL {totalLevel(state)}</small></span></button>
         <div className="skill-list expanded-skills">
           {SKILL_IDS.filter((id) => id !== "combat").map((id) => {
             const Icon = skillIcons[id];
             return <button key={id} className={`skill-button ${view === "skills" && selectedSkill === id ? "selected" : ""}`} onClick={() => { setSelectedSkill(id); setView("skills"); }}><span className="skill-icon"><Icon /></span><span><strong>{skillMeta[id].name}</strong><small>{skillMeta[id].group}</small></span><b>{state.skills[id].level}</b>{active.skillId === id ? <i className="active-pip" /> : null}</button>;
           })}
         </div>
-        <button className={`home-button bank-link ${view === "bank" ? "selected" : ""}`} onClick={() => setView("bank")}><Boxes /><span><strong>Cargo Bank</strong><small>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} items</small></span></button>
-      </aside>
+        <button className="home-button bank-link" onClick={() => openView("bank")}><Boxes /><span><strong>Cargo Bank</strong><small>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} items</small></span></button>
+      </aside> : null}
 
       <main className="play-column">
         {offlineReport ? <div className="offline-report panel"><Cloud /><div><strong>Offline patrol report · {duration(offlineReport.seconds)}</strong><span>{offlineReport.activity} · {offlineReport.actions} actions · +{offlineReport.xp} XP · {itemsText(offlineReport.gains)}</span></div><button onClick={() => setOfflineReport(null)}>×</button></div> : null}
@@ -701,23 +704,26 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
         <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} /><Stat icon={Medal} label="Patrol" value={state.patrol} /><Stat icon={Trophy} label="Command" value={state.commandPoints} /></div>
         <div className="vitals panel"><div><span>Hull</span><strong>{state.hull} / {state.maxHull}</strong></div><Progress value={state.hull / state.maxHull * 100} /><div><span>Shields</span><strong>{state.shields}</strong></div><Progress value={Math.min(100, state.shields)} /><div><span>Crew morale</span><strong>{state.crewMorale}%</strong></div><Progress value={state.crewMorale} /></div>
         <div className="side-nav panel">
-          {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => setView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
-        </div>
-        <div className={`save-state panel ${saveStatus}`}>
-          {saveStatus === "guest" ? <><Radio /><div><strong>Guest commander</strong><span>Saved on this device. Sign in for a D1 cloud save.</span><a href={signInPath} target="_top">Sign in with ChatGPT</a></div></> : null}
-          {saveStatus === "saved" ? <><ShieldCheck /><div><strong>Cloud save current</strong><span>Your patrol is synced.</span></div></> : null}
-          {saveStatus === "saving" ? <><Radio className="pulse" /><div><strong>Saving patrol</strong><span>Uploading the latest action.</span></div></> : null}
-          {saveStatus === "error" ? <><Radio /><div><strong>Cloud link interrupted</strong><span>Progress continues locally until retry.</span></div></> : null}
+          {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
         </div>
       </aside>
 
       <nav className="mobile-nav wide-mobile" aria-label="Game sections">
-        <button className={view === "skills" ? "selected" : ""} onClick={() => setView("skills")}><Activity /><span>Skills</span></button>
-        <button className={view === "ship" ? "selected" : ""} onClick={() => setView("ship")}><Rocket /><span>Ship</span></button>
-        <button className={view === "sectors" ? "selected" : ""} onClick={() => setView("sectors")}><Map /><span>Galaxy</span></button>
-        <button className={view === "contracts" ? "selected" : ""} onClick={() => setView("contracts")}><ScrollText /><span>Jobs</span></button>
-        <button className={view === "bank" ? "selected" : ""} onClick={() => setView("bank")}><Boxes /><span>Bank</span></button>
+        <button className={view === "skills" ? "selected" : ""} onClick={() => openView("skills")}><Activity /><span>Skills</span></button>
+        <button className={view === "ship" ? "selected" : ""} onClick={() => openView("ship")}><Rocket /><span>Ship</span></button>
+        <button className={view === "sectors" ? "selected" : ""} onClick={() => openView("sectors")}><Map /><span>Galaxy</span></button>
+        <button className={view === "contracts" ? "selected" : ""} onClick={() => openView("contracts")}><ScrollText /><span>Jobs</span></button>
+        <button className={view === "bank" ? "selected" : ""} onClick={() => openView("bank")}><Boxes /><span>Bank</span></button>
+        <button className={mobileMenuOpen ? "selected" : ""} onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen}><Menu /><span>More</span></button>
       </nav>
+
+      {mobileMenuOpen ? <div className="mobile-more-overlay" role="dialog" aria-modal="true" aria-label="More game sections">
+        <button className="mobile-more-backdrop" aria-label="Close menu" onClick={() => setMobileMenuOpen(false)} />
+        <section className="mobile-more-panel panel">
+          <header><div><p className="eyebrow">COMMAND MENU</p><h2>More sections</h2></div><button aria-label="Close menu" onClick={() => setMobileMenuOpen(false)}><X /></button></header>
+          {navigation.map((group) => <div key={group.group} className="mobile-more-group"><p className="eyebrow">{group.group}</p><div>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span></button>; })}</div></div>)}
+        </section>
+      </div> : null}
     </div>
     </>
   );

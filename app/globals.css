@@ -82,6 +82,10 @@ h3 { font-size: 1rem; }
 }
 .account-link { gap: 7px; background: #111a24; cursor: pointer; }
 .account-link svg { width: 17px; }
+.header-save-indicator { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #3a495b; color: #71b99f; background: #0d151d; }
+.header-save-indicator svg { width: 16px; }
+.header-save-indicator.saving { color: #73bfd0; animation: pulse 1.05s ease-in-out infinite; }
+.header-save-indicator.error { color: #e17171; border-color: #713d3d; }
 .sign-in-link { border-color: #e3ac45; background: #e3ac45; color: #07090c; }
 .account-link:hover, .account-link:focus-visible { border-color: #e3ac45; color: #efc46d; }
 
@@ -247,7 +251,7 @@ h3 { font-size: 1rem; }
 .objective-row.claimed { opacity: .67; border-color: #315b53; }
 .pulse { animation: pulse 1.05s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .3; } }
-.mobile-nav { display: none; }
+.mobile-nav, .mobile-more-overlay { display: none; }
 
 @media (max-width: 1200px) {
   .game-layout { grid-template-columns: 235px minmax(430px, 1fr); }
@@ -321,6 +325,7 @@ h3 { font-size: 1rem; }
 
 /* Starfall v3 command surfaces */
 .game-layout.v3 { grid-template-columns: 246px minmax(520px, 1fr) 286px; max-width: 1660px; }
+.game-layout.v3.without-skill-nav { grid-template-columns: minmax(520px, 1fr) 286px; max-width: 1398px; }
 .game-layout.v3 .command-nav, .v3-status { max-height: calc(100vh - 102px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #334456 transparent; }
 .home-button {
   width: 100%; min-height: 64px; padding: 11px 13px; border: 0; border-bottom: 1px solid #253241;
@@ -526,16 +531,18 @@ h3 { font-size: 1rem; }
 
 @media (max-width: 1250px) {
   .game-layout.v3 { grid-template-columns: 225px minmax(470px, 1fr); }
+  .game-layout.v3.without-skill-nav { grid-template-columns: minmax(470px, 1fr) 286px; }
   .v3-status { grid-column: 1 / -1; max-height: none; overflow: visible; display: grid; grid-template-columns: 1fr 1fr 2fr; position: static; }
+  .game-layout.v3.without-skill-nav .v3-status { grid-column: auto; max-height: calc(100vh - 102px); overflow-y: auto; display: flex; position: sticky; }
   .v3-status .side-nav { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); }
   .v3-status .save-state { min-height: 100%; }
 }
 
 @media (max-width: 760px) {
   .game-layout.v3 .command-nav { max-height: none; overflow: visible; }
-  .game-layout.v3 .command-nav { order: 2; }
-  .game-layout.v3 .play-column { order: 1; }
-  .game-layout.v3 .v3-status { order: 3; max-height: none; display: flex; }
+  .game-layout.v3 .command-nav { order: 1; }
+  .game-layout.v3 .play-column { order: 2; }
+  .game-layout.v3 .v3-status, .game-layout.v3.without-skill-nav .v3-status { display: none; }
   .expanded-skills { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .expanded-skills .skill-button { min-height: 44px; }
   .v3-heading { display: grid; grid-template-columns: 1fr; }
@@ -565,5 +572,16 @@ h3 { font-size: 1rem; }
   .settings-panel, .account-settings { grid-template-columns: 1fr; gap: 18px; padding: 16px; }
   .account-settings > a { width: 100%; }
   .v3-status .side-nav { display: grid; grid-template-columns: 1fr; }
-  .mobile-nav.wide-mobile { grid-template-columns: repeat(5, 1fr); }
+  .mobile-nav.wide-mobile { grid-template-columns: repeat(6, 1fr); }
+  .mobile-more-overlay { display: block; position: fixed; inset: 0; z-index: 60; }
+  .mobile-more-backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: rgb(0 0 0 / 68%); }
+  .mobile-more-panel { width: 100%; max-height: min(76vh, 650px); padding: 16px; position: absolute; left: 0; right: 0; bottom: 0; overflow-y: auto; border-bottom: 0; background: #0b121a; }
+  .mobile-more-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .mobile-more-panel > header button { width: 38px; height: 38px; border: 1px solid #334354; display: grid; place-items: center; color: #d6dfe7; background: #111b25; }
+  .mobile-more-panel > header svg { width: 18px; }
+  .mobile-more-group { margin-top: 14px; }
+  .mobile-more-group > div { margin-top: 7px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .mobile-more-group button { min-height: 50px; padding: 9px 10px; border: 1px solid #293847; display: flex; align-items: center; gap: 9px; color: #aab6c1; text-align: left; background: #101923; }
+  .mobile-more-group button.selected { border-color: #b98b3f; color: #efc168; background: #1b1a17; }
+  .mobile-more-group button svg { width: 18px; flex: 0 0 auto; }
 }
