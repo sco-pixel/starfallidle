@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { defaultGameState, sanitizeGameState, type GameState } from "./game-state";
+import { syncHiscores } from "./hiscores";
 
 export { defaultGameState, sanitizeGameState } from "./game-state";
 export type { GameState, SkillId } from "./game-state";
@@ -16,6 +17,7 @@ export async function loadGameState(userId: string): Promise<GameState> {
   catch { return defaultGameState(); }
 }
 
-export async function saveGameState(userId: string, state: GameState): Promise<void> {
+export async function saveGameState(userId: string, state: GameState, displayName?: string): Promise<void> {
   await database().prepare(`INSERT INTO game_saves (user_id, state_json, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET state_json = excluded.state_json, updated_at = CURRENT_TIMESTAMP`).bind(userId, JSON.stringify(state)).run();
+  await syncHiscores(userId, state.displayName || displayName || "Unknown Commander", state);
 }

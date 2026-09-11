@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   try {
     const state = sanitizeGameState(await request.json());
-    await saveGameState(user.userId, state);
+    await saveGameState(user.userId, state, user.displayName);
     return NextResponse.json({ saved: true });
   } catch (error) {
     console.error("Unable to save game", error);

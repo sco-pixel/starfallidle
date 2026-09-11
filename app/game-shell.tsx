@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronRight,
+  Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
   Hammer, HeartPulse, History, Landmark, LockKeyhole, Map, Medal, Orbit,
-  Menu, PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Shield,
+  Menu, PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Search, Shield,
   ShieldCheck, Sparkles, Star, Target, Telescope, TrendingUp, Trophy,
   UserRound, Users, Wrench, X, Zap,
 } from "lucide-react";
@@ -39,7 +39,7 @@ declare global {
 }
 
 type SaveStatus = "guest" | "saved" | "saving" | "error";
-type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "missions";
+type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "missions" | "hiscores";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
@@ -71,7 +71,8 @@ const navigation: { group: string; items: { id: ViewId; label: string; icon: typ
   ] },
   { group: "Archives", items: [
     { id: "research", label: "Research", icon: BrainCircuit }, { id: "collection", label: "Collection", icon: Telescope },
-    { id: "missions", label: "Missions", icon: ScrollText }, { id: "patrol", label: "Patrol Record", icon: Medal }, { id: "character", label: "Character", icon: UserRound },
+    { id: "missions", label: "Missions", icon: ScrollText }, { id: "patrol", label: "Patrol Record", icon: Medal },
+    { id: "hiscores", label: "Hiscores", icon: Trophy }, { id: "character", label: "Character", icon: UserRound },
   ] },
 ];
 
@@ -804,6 +805,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
     character: ["Character & Settings", "Manage your commander identity and account"],
     outposts: ["Sector Outposts", "Develop support infrastructure across the five established sectors"],
     missions: ["Mission Chains", "Complete connected objectives that advance the Starfall story"],
+    hiscores: ["Commander Hiscores", "Compare verified cloud-save records across the Starfall fleet"],
   };
 
   return (
@@ -820,7 +822,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
             : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
         </div>
       </header>
-    <div className={`game-layout v3 ${view === "skills" ? "with-skill-nav" : "without-skill-nav"}`}>
+    <div className={`game-layout v3 ${view === "skills" ? "with-skill-nav" : "without-skill-nav"} ${view === "hiscores" ? "hiscores-mode" : ""}`}>
       {view === "skills" ? <aside className="command-nav panel">
         <button className="home-button selected" onClick={() => setView("skills")}><Activity /><span><strong>Skill Matrix</strong><small>TL {totalLevel(state)}</small></span></button>
         <div className="skill-list expanded-skills">
@@ -861,16 +863,17 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
         {view === "patrol" ? <PatrolView state={state} onNewPatrol={beginNewPatrol} /> : null}
         {view === "outposts" ? <OutpostView state={state} onDevelop={developOutpost} /> : null}
         {view === "missions" ? <MissionView state={state} onClaim={claimMission} /> : null}
+        {view === "hiscores" ? <HiscoresView signedIn={signedIn} signInPath={signInPath} /> : null}
         {view === "character" ? <CharacterView state={state} fallbackName={accountName} email={accountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
       </main>
 
-      <aside className="status-column v3-status">
+      {view !== "hiscores" ? <aside className="status-column v3-status">
         <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} /><Stat icon={Medal} label="Patrol" value={state.patrol} /><Stat icon={Trophy} label="Command" value={state.commandPoints} /></div>
         <div className="vitals panel"><div><span>Hull</span><strong>{state.hull} / {state.maxHull}</strong></div><Progress value={state.hull / state.maxHull * 100} /><div><span>Shields</span><strong>{state.shields}</strong></div><Progress value={Math.min(100, state.shields)} /><div><span>Crew morale</span><strong>{state.crewMorale}%</strong></div><Progress value={state.crewMorale} /></div>
         <div className="side-nav panel">
           {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
         </div>
-      </aside>
+      </aside> : null}
 
       <nav className="mobile-nav wide-mobile" aria-label="Game sections">
         <button className={view === "skills" ? "selected" : ""} onClick={() => openView("skills")}><Activity /><span>Skills</span></button>
@@ -1048,6 +1051,146 @@ function MarketView({ state, getPrice, onTrade }: { state: GameState; getPrice: 
 function PatrolView({ state, onNewPatrol }: { state: GameState; onNewPatrol: () => void }) {
   const ready = totalLevel(state) >= 700 && state.completedExpeditions >= 6 && (state.combat.victories["boss-sentinel-foundry"] ?? 0) >= 1;
   return <><div className="patrol-hero panel"><Medal /><div><p className="eyebrow">COMMISSION {String(state.patrol).padStart(2, "0")}</p><h2>{state.commandPoints} Command Points</h2><p>New commissions award 2 Command Points plus mission bonuses. Mastered operations, veteran crew, research, discoveries and unique boss gear carry forward.</p></div><AlertDialog><AlertDialogTrigger asChild><Button disabled={!ready}>Begin new patrol</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>End the current patrol?</AlertDialogTitle><AlertDialogDescription>This resets skill XP, ordinary cargo, ship modules, outposts and standard equipment. Research, discoveries, operation mastery, crew progression, unique gear and Command Points are retained.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep patrolling</AlertDialogCancel><AlertDialogAction onClick={onNewPatrol}>Begin new commission</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div><div className="record-grid"><section className="panel"><h2>Achievements</h2>{achievements.map((entry) => <div key={entry.id} className={state.achievements.includes(entry.id) ? "earned" : ""}>{state.achievements.includes(entry.id) ? <Trophy /> : <LockKeyhole />}<span>{entry.name}</span></div>)}</section><section className="panel"><h2>Patrol requirements</h2><div className={totalLevel(state) >= 700 ? "earned" : ""}><Check /><span>Total level 700 ({totalLevel(state)} / 700)</span></div><div className={state.completedExpeditions >= 6 ? "earned" : ""}><Check /><span>Complete 6 expeditions ({state.completedExpeditions} / 6)</span></div><div className={(state.combat.victories["boss-sentinel-foundry"] ?? 0) >= 1 ? "earned" : ""}><Check /><span>Defeat the Sentinel Foundry</span></div><div><History /><span>{state.totalActions.toLocaleString()} lifetime actions this patrol</span></div></section><section className="panel log-record"><h2>Captain&apos;s log</h2>{state.storyLog.slice(0, 30).map((entry, index) => <p key={index}>{entry}</p>)}</section></div></>;
+}
+
+type HiscoreScope = "all" | "patrol" | "weekly";
+type HiscoreCategory = "overall" | SkillId;
+type HiscoreRow = { rank: number; displayName: string; level: number; xp: number };
+type HiscoreRecord = {
+  display_name: string;
+  total_level: number;
+  all_time_xp: number;
+  boss_victories: number;
+  missions_completed: number;
+  expeditions_completed: number;
+  patrol_commissions: number;
+  operations_mastered: number;
+  best_combat_streak: number;
+};
+type HiscoreResponse = {
+  rows: HiscoreRow[];
+  total: number;
+  page: number;
+  pages: number;
+  player: HiscoreRow | null;
+  record: HiscoreRecord | null;
+};
+
+const hiscoreScopes: { id: HiscoreScope; label: string; detail: string }[] = [
+  { id: "all", label: "All Time", detail: "Lifetime XP retained across patrol commissions" },
+  { id: "patrol", label: "Current Patrol", detail: "Progress earned during the active commission" },
+  { id: "weekly", label: "Weekly", detail: "XP gained since Monday at 00:00 UTC" },
+];
+
+function HiscoresView({ signedIn, signInPath }: { signedIn: boolean; signInPath: string }) {
+  const [category, setCategory] = useState<HiscoreCategory>("overall");
+  const [scope, setScope] = useState<HiscoreScope>("all");
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [data, setData] = useState<HiscoreResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ category, scope, page: String(page) });
+    if (search) params.set("search", search);
+    fetch(`/api/hiscores?${params}`, { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null) as { error?: string } | null;
+          throw new Error(payload?.error ?? "Unable to load rankings");
+        }
+        return response.json() as Promise<HiscoreResponse>;
+      })
+      .then((result) => { setData(result); setLoading(false); })
+      .catch((reason: Error) => {
+        if (reason.name === "AbortError") return;
+        setError(reason.message);
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, [category, page, reload, scope, search]);
+
+  const beginLoad = () => { setLoading(true); setError(""); };
+  const chooseCategory = (next: HiscoreCategory) => { beginLoad(); setCategory(next); setPage(1); };
+  const chooseScope = (next: HiscoreScope) => { beginLoad(); setScope(next); setPage(1); };
+  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    beginLoad();
+    setSearch(searchInput.trim().slice(0, 32));
+    setPage(1);
+  };
+  const changePage = (next: number) => { beginLoad(); setPage(next); };
+  const categoryName = category === "overall" ? "Overall" : skillMeta[category].name;
+  const recordRows = data?.record ? [
+    ["Boss victories", data.record.boss_victories, Crosshair],
+    ["Missions completed", data.record.missions_completed, ScrollText],
+    ["Expeditions completed", data.record.expeditions_completed, Compass],
+    ["Patrol commissions", data.record.patrol_commissions, Medal],
+    ["Operations mastered", data.record.operations_mastered, Check],
+    ["Best combat streak", data.record.best_combat_streak, Zap],
+  ] as const : [];
+
+  return <div className="hiscores-layout">
+    <aside className="hiscore-categories panel">
+      <form className="hiscore-search" onSubmit={submitSearch}>
+        <label htmlFor="commander-search">Find a commander</label>
+        <div><Search /><Input id="commander-search" value={searchInput} maxLength={32} onChange={(event) => setSearchInput(event.target.value)} placeholder="Commander name" /><Button type="submit">Search</Button></div>
+        {search ? <button type="button" className="clear-ranking-search" onClick={() => { beginLoad(); setSearchInput(""); setSearch(""); setPage(1); }}>Clear search for “{search}”</button> : null}
+      </form>
+      <div className="hiscore-category-list" aria-label="Ranking category">
+        <button className={category === "overall" ? "selected" : ""} onClick={() => chooseCategory("overall")}><Trophy /><span><strong>Overall</strong><small>All fourteen skills</small></span><ChevronRight /></button>
+        {SKILL_IDS.map((id) => { const Icon = skillIcons[id]; return <button key={id} className={category === id ? "selected" : ""} onClick={() => chooseCategory(id)}><Icon /><span><strong>{skillMeta[id].name}</strong><small>Level and experience</small></span><ChevronRight /></button>; })}
+      </div>
+    </aside>
+
+    <section className="hiscore-board panel" aria-busy={loading}>
+      <header className="hiscore-board-head">
+        <div><p className="eyebrow">VERIFIED COMMANDER RANKINGS</p><h2>{categoryName} Hiscores</h2><p>{hiscoreScopes.find((entry) => entry.id === scope)?.detail}</p></div>
+        <span>{data?.total ?? 0} ranked</span>
+      </header>
+      <div className="hiscore-tabs" role="group" aria-label="Ranking period">
+        {hiscoreScopes.map((entry) => <button key={entry.id} aria-pressed={scope === entry.id} className={scope === entry.id ? "selected" : ""} onClick={() => chooseScope(entry.id)}>{entry.label}</button>)}
+      </div>
+
+      <div className="hiscore-table-wrap">
+        <table className="hiscore-table">
+          <thead><tr><th>Rank</th><th>Commander</th><th>{category === "overall" ? "Total level" : "Level"}</th><th>{scope === "weekly" ? "XP gained" : "Total XP"}</th></tr></thead>
+          <tbody>
+            {loading ? Array.from({ length: 6 }, (_, index) => <tr key={index} className="hiscore-loading"><td colSpan={4}><span /></td></tr>) : null}
+            {!loading && error ? <tr><td colSpan={4} className="hiscore-empty"><Radio />{error}<Button variant="outline" onClick={() => { beginLoad(); setReload((value) => value + 1); }}>Retry</Button></td></tr> : null}
+            {!loading && !error && !data?.rows.length ? <tr><td colSpan={4} className="hiscore-empty"><Trophy /><strong>No commanders found</strong><span>{search ? "Try another commander name." : "The first signed-in cloud save will establish this ranking."}</span></td></tr> : null}
+            {!loading && !error ? data?.rows.map((row) => <tr key={`${row.rank}-${row.displayName}`} className={`${row.rank <= 3 ? `podium rank-${row.rank}` : ""} ${data.player?.rank === row.rank && data.player.displayName === row.displayName ? "player-row" : ""}`}><td><span className="rank-value">{row.rank <= 3 ? <Medal /> : null}{row.rank.toLocaleString()}</span></td><td><strong>{row.displayName}</strong>{data.player?.rank === row.rank && data.player.displayName === row.displayName ? <small>YOU</small> : null}</td><td>{fmt(row.level)}</td><td>{fmt(row.xp)}</td></tr>) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <footer className="hiscore-pagination">
+        <Button variant="outline" disabled={page <= 1 || loading} onClick={() => changePage(Math.max(1, page - 1))}><ChevronLeft /> Previous</Button>
+        <span>Page <strong>{data?.page ?? page}</strong> of <strong>{data?.pages ?? 1}</strong></span>
+        <Button variant="outline" disabled={page >= (data?.pages ?? 1) || loading} onClick={() => changePage(page + 1)}>Next <ChevronRight /></Button>
+      </footer>
+    </section>
+
+    <aside className="hiscore-personal">
+      <section className="personal-rank panel">
+        <p className="eyebrow">YOUR RECORD</p>
+        {signedIn && data?.player ? <><div className="personal-rank-number"><Medal /><span>Rank</span><strong>#{fmt(data.player.rank)}</strong></div><h3>{data.player.displayName}</h3><div className="personal-rank-stats"><span>{category === "overall" ? "Total level" : `${categoryName} level`}<b>{fmt(data.player.level)}</b></span><span>{scope === "weekly" ? "XP gained" : "Experience"}<b>{fmt(data.player.xp)}</b></span></div></> : null}
+        {signedIn && !loading && !data?.player ? <div className="personal-rank-empty"><Cloud /><strong>Awaiting cloud save</strong><span>Your commander will enter the rankings after the next successful save.</span></div> : null}
+        {!signedIn ? <div className="personal-rank-empty"><ShieldCheck /><strong>Verify your commander</strong><span>Sign in to join the Hiscores and see your personal rank.</span><a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a></div> : null}
+      </section>
+
+      <section className="fleet-records panel">
+        <div><p className="eyebrow">OTHER HISCORES</p><h3>Patrol record</h3></div>
+        {recordRows.length ? recordRows.map(([label, value, Icon]) => <div key={label}><Icon /><span>{label}</span><strong>{fmt(value)}</strong></div>) : <p className="fleet-records-placeholder">Sign in and save progress to reveal your verified records.</p>}
+      </section>
+
+      <p className="hiscore-integrity"><ShieldCheck /> Only signed-in cloud saves enter the rankings. Updates are verified and written by the server.</p>
+    </aside>
+  </div>;
 }
 
 function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; onSaveName: (name: string) => void }) {
