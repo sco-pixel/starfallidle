@@ -11,10 +11,14 @@ function database(): D1Database {
 }
 
 export async function loadGameState(userId: string): Promise<GameState> {
+  return (await loadGameSave(userId)).state;
+}
+
+export async function loadGameSave(userId: string): Promise<{ state: GameState; exists: boolean }> {
   const row = await database().prepare("SELECT state_json FROM game_saves WHERE user_id = ? LIMIT 1").bind(userId).first<{ state_json: string }>();
-  if (!row) return defaultGameState();
-  try { return sanitizeGameState(JSON.parse(row.state_json)); }
-  catch { return defaultGameState(); }
+  if (!row) return { state: defaultGameState(), exists: false };
+  try { return { state: sanitizeGameState(JSON.parse(row.state_json)), exists: true }; }
+  catch { return { state: defaultGameState(), exists: true }; }
 }
 
 export async function saveGameState(userId: string, state: GameState, displayName?: string): Promise<void> {

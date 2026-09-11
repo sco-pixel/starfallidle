@@ -692,6 +692,12 @@ h3 { font-size: 1rem; }
 
 [data-slot="alert-dialog-content"] { border-radius: 0; border-color: #3a4b5d; background: #0c131c; }
 [data-slot="alert-dialog-content"] button { border-radius: 0; }
+.guest-import-dialog { max-width: 620px; }
+.guest-import-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.guest-import-comparison section { min-height: 112px; padding: 13px; border: 1px solid #334252; display: grid; gap: 5px; background: #091018; }
+.guest-import-comparison section:first-child { border-color: #80622f; background: #d3a1450a; }
+.guest-import-comparison strong { margin: 3px 0; color: #e7edf2; }
+.guest-import-comparison span { color: #8998a6; font-size: .75rem; }
 
 @media (max-width: 1250px) {
   .game-layout.v3 { grid-template-columns: 225px minmax(470px, 1fr); }
@@ -707,6 +713,7 @@ h3 { font-size: 1rem; }
 }
 
 @media (max-width: 760px) {
+  .guest-import-comparison { grid-template-columns: 1fr; }
   .game-layout.v3 .command-nav { max-height: none; overflow: visible; }
   .game-layout.v3 .command-nav { order: 1; }
   .game-layout.v3 .play-column { order: 2; }
