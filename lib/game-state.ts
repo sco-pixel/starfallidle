@@ -26,6 +26,7 @@ export type CombatState = {
 
 export type GameState = {
   version: 4;
+  displayName: string;
   credits: number;
   skills: Record<SkillId, SkillProgress>;
   mastery: Record<SkillId, number>;
@@ -119,6 +120,7 @@ export function defaultGameState(): GameState {
   const mastery = Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>;
   return {
     version: 4,
+    displayName: "",
     credits: 180,
     skills,
     mastery,
@@ -204,6 +206,7 @@ export function sanitizeGameState(value: unknown): GameState {
 
   return {
     version: 4,
+    displayName: typeof input.displayName === "string" ? input.displayName.trim().slice(0, 32) : "",
     credits: boundedNumber(input.credits, defaults.credits),
     skills,
     mastery,

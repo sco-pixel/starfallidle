@@ -80,6 +80,8 @@ h3 { font-size: 1rem; }
   min-height: 40px; padding: 0 14px; border: 1px solid #3a495b; display: inline-flex; align-items: center;
   justify-content: center; color: #dbe4ed; text-decoration: none; font-size: .875rem; font-weight: 750; white-space: nowrap;
 }
+.account-link { gap: 7px; background: #111a24; cursor: pointer; }
+.account-link svg { width: 17px; }
 .sign-in-link { border-color: #e3ac45; background: #e3ac45; color: #07090c; }
 .account-link:hover, .account-link:focus-visible { border-color: #e3ac45; color: #efc46d; }
 
@@ -494,6 +496,25 @@ h3 { font-size: 1rem; }
 .record-grid > section { padding: 15px; }
 .record-grid h2 { margin-bottom: 12px; }
 .record-grid section > div { min-height: 38px; padding: 7px 0; border-bottom: 1px solid #23303e; display: flex; align-items: center; gap: 8px; color: #778493; font-size: .78rem; }
+
+.character-settings { display: grid; gap: 12px; }
+.character-card { min-height: 150px; padding: 20px; display: grid; grid-template-columns: 72px 1fr auto; gap: 18px; align-items: center; border-color: #65502a; }
+.character-emblem { width: 72px; height: 72px; display: grid; place-items: center; border: 1px solid #e3ac45; background: #e3ac4510; color: #efbf64; font: 800 1.35rem var(--font-mono); }
+.character-card h2 { margin-top: 5px; font-size: 1.35rem; }
+.character-card span { color: #8998a8; font-size: .82rem; }
+.character-record { display: grid; grid-template-columns: repeat(3, minmax(76px, 1fr)); gap: 7px; }
+.character-record span { min-height: 58px; padding: 9px; display: grid; gap: 3px; border: 1px solid #2b3948; text-align: center; }
+.character-record b { color: #eef3f7; font: 750 .92rem var(--font-mono); }
+.settings-panel { padding: 20px; display: grid; grid-template-columns: minmax(220px, .75fr) minmax(300px, 1.25fr); gap: 28px; align-items: center; }
+.settings-panel h2 { margin-top: 4px; }
+.settings-panel p { margin-top: 7px; color: #8998a8; font-size: .86rem; }
+.settings-panel form { display: grid; gap: 7px; }
+.settings-panel form > label { color: #c8d1d9; font-size: .78rem; font-weight: 700; }
+.settings-panel form > div { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.settings-panel form small { color: #71808f; font: .68rem var(--font-mono); }
+.account-settings { grid-template-columns: 1fr auto; }
+.sign-out-link { min-height: 40px; padding: 0 16px; border: 1px solid #743d3d; display: inline-flex; align-items: center; justify-content: center; color: #f09494; text-decoration: none; font-size: .82rem; font-weight: 750; }
+.sign-out-link:hover, .sign-out-link:focus-visible { border-color: #ed6868; background: #ed686810; }
 .record-grid section > div.earned { color: #cfe9df; }
 .record-grid section > div svg { width: 16px; }
 .record-grid section > div.earned svg { color: #67b99d; }
@@ -538,6 +559,11 @@ h3 { font-size: 1rem; }
   .patrol-hero button { grid-column: 1 / -1; width: 100%; }
   .record-grid { grid-template-columns: 1fr; }
   .record-grid .log-record { grid-column: 1; }
+  .character-card { grid-template-columns: 58px 1fr; padding: 16px; }
+  .character-emblem { width: 58px; height: 58px; }
+  .character-record { grid-column: 1 / -1; }
+  .settings-panel, .account-settings { grid-template-columns: 1fr; gap: 18px; padding: 16px; }
+  .account-settings > a { width: 100%; }
   .v3-status .side-nav { display: grid; grid-template-columns: 1fr; }
   .mobile-nav.wide-mobile { grid-template-columns: repeat(5, 1fr); }
 }

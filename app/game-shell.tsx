@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
   Hammer, HeartPulse, History, Landmark, LockKeyhole, Map, Medal, Orbit,
   PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Shield,
   ShieldCheck, Sparkles, Star, Target, Telescope, TrendingUp, Trophy,
-  Users, Wrench, Zap,
+  UserRound, Users, Wrench, Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -37,7 +38,7 @@ declare global {
 }
 
 type SaveStatus = "guest" | "saved" | "saving" | "error";
-type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "drones" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol";
+type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "drones" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
@@ -69,7 +70,7 @@ const navigation: { group: string; items: { id: ViewId; label: string; icon: typ
   ] },
   { group: "Archives", items: [
     { id: "research", label: "Research", icon: BrainCircuit }, { id: "collection", label: "Collection", icon: Telescope },
-    { id: "patrol", label: "Patrol Record", icon: Medal },
+    { id: "patrol", label: "Patrol Record", icon: Medal }, { id: "character", label: "Character", icon: UserRound },
   ] },
 ];
 
@@ -335,7 +336,7 @@ function completeExpedition(state: GameState) {
   });
 }
 
-export function GameShell({ initialState, signedIn, saveAvailable, signInPath }: { initialState: GameState; signedIn: boolean; saveAvailable: boolean; signInPath: string }) {
+export function GameShell({ initialState, signedIn, saveAvailable, accountName, accountEmail, signInPath, signOutPath }: { initialState: GameState; signedIn: boolean; saveAvailable: boolean; accountName: string; accountEmail: string | null; signInPath: string; signOutPath: string }) {
   const [state, setState] = useState(initialState);
   const [view, setView] = useState<ViewId>("skills");
   const [selectedSkill, setSelectedSkill] = useState<SkillId>(initialState.activeTask.skillId);
@@ -382,7 +383,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
     let base = initialState;
     if (!signedIn) {
       try {
-        const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
+        const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
         if (parsed) base = sanitizeGameState(parsed);
       } catch {}
     }
@@ -401,7 +402,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
   useEffect(() => {
     if (!hydrated || signedIn) return;
     const saveGuest = () => {
-      try { localStorage.setItem("starfall-idle-save-v3", JSON.stringify({ ...stateRef.current, lastActiveAt: Date.now() })); } catch {}
+      try { localStorage.setItem("starfall-idle-save-v4", JSON.stringify({ ...stateRef.current, lastActiveAt: Date.now() })); } catch {}
     };
     const timer = setInterval(saveGuest, 3000);
     document.addEventListener("visibilitychange", saveGuest);
@@ -494,6 +495,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
   const xpStart = xpForLevel(selectedProgress.level);
   const xpEnd = selectedProgress.level === MAX_SKILL_LEVEL ? selectedProgress.xp : xpForLevel(selectedProgress.level + 1);
   const xpProgress = selectedProgress.level === MAX_SKILL_LEVEL ? 100 : (selectedProgress.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
+  const displayName = state.displayName || accountName;
 
   const travel = (sectorId: string) => updateState((current) => {
     const destination = sectorById[sectorId];
@@ -635,9 +637,23 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
     collection: ["Discovery Archive", "Record resources, enemies, ruins and expeditions"],
     market: ["Station Market", "Prices shift every five minutes and vary by sector"],
     patrol: ["Patrol Record", "Achievements, mastery and five-year commission cycles"],
+    character: ["Character & Settings", "Manage your commander identity and account"],
   };
 
   return (
+    <>
+      <header className="site-header">
+        <div className="brand-lockup">
+          <span className="brand-mark" aria-hidden="true"><Orbit /></span>
+          <div><p className="eyebrow">SECTOR // EREBUS</p><h1>Starfall Idle</h1></div>
+        </div>
+        <div className="account-area">
+          <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
+          {signedIn
+            ? <button className="account-link" onClick={() => setView("character")}><UserRound /> Character</button>
+            : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+        </div>
+      </header>
     <div className="game-layout v3">
       <aside className="command-nav panel">
         <button className={`home-button ${view === "skills" ? "selected" : ""}`} onClick={() => setView("skills")}><Activity /><span><strong>Skill Matrix</strong><small>TL {totalLevel(state)}</small></span></button>
@@ -678,6 +694,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
         {view === "collection" ? <CollectionView state={state} /> : null}
         {view === "market" ? <MarketView state={state} getPrice={marketPrice} onTrade={trade} /> : null}
         {view === "patrol" ? <PatrolView state={state} onNewPatrol={beginNewPatrol} /> : null}
+        {view === "character" ? <CharacterView state={state} fallbackName={accountName} email={accountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
       </main>
 
       <aside className="status-column v3-status">
@@ -702,6 +719,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
         <button className={view === "bank" ? "selected" : ""} onClick={() => setView("bank")}><Boxes /><span>Bank</span></button>
       </nav>
     </div>
+    </>
   );
 }
 
@@ -824,6 +842,38 @@ function MarketView({ state, getPrice, onTrade }: { state: GameState; getPrice: 
 function PatrolView({ state, onNewPatrol }: { state: GameState; onNewPatrol: () => void }) {
   const ready = totalLevel(state) >= 100 && state.completedExpeditions >= 2;
   return <><div className="patrol-hero panel"><Medal /><div><p className="eyebrow">COMMISSION {String(state.patrol).padStart(2, "0")}</p><h2>{state.commandPoints} Command Points</h2><p>Each completed patrol permanently extends offline progress. Research and discoveries carry into the next commission.</p></div><AlertDialog><AlertDialogTrigger asChild><Button disabled={!ready}>Begin new patrol</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>End the current patrol?</AlertDialogTitle><AlertDialogDescription>This resets skills, cargo, ship modules and equipment. Research, discoveries, achievements and Command Points are retained.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep patrolling</AlertDialogCancel><AlertDialogAction onClick={onNewPatrol}>Begin new commission</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div><div className="record-grid"><section className="panel"><h2>Achievements</h2>{achievements.map((entry) => <div key={entry.id} className={state.achievements.includes(entry.id) ? "earned" : ""}>{state.achievements.includes(entry.id) ? <Trophy /> : <LockKeyhole />}<span>{entry.name}</span></div>)}</section><section className="panel"><h2>Patrol requirements</h2><div className={totalLevel(state) >= 100 ? "earned" : ""}><Check /><span>Total level 100 ({totalLevel(state)} / 100)</span></div><div className={state.completedExpeditions >= 2 ? "earned" : ""}><Check /><span>Complete 2 expeditions ({state.completedExpeditions} / 2)</span></div><div><History /><span>{state.totalActions.toLocaleString()} lifetime actions this patrol</span></div></section><section className="panel log-record"><h2>Captain&apos;s log</h2>{state.storyLog.slice(0, 8).map((entry, index) => <p key={index}>{entry}</p>)}</section></div></>;
+}
+
+function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; onSaveName: (name: string) => void }) {
+  const [name, setName] = useState(state.displayName || fallbackName);
+  const savedName = state.displayName || fallbackName;
+  const initials = savedName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "SC";
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSaveName(name.trim().slice(0, 32));
+  };
+
+  return <div className="character-settings">
+    <section className="character-card panel">
+      <div className="character-emblem">{initials}</div>
+      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{signedIn ? "ChatGPT account linked · cloud save active" : "Guest profile · saved on this device"}</span></div>
+      <div className="character-record"><span>Patrol <b>{state.patrol}</b></span><span>Total level <b>{totalLevel(state)}</b></span><span>Operations <b>{fmt(state.totalActions)}</b></span></div>
+    </section>
+
+    <section className="settings-panel panel">
+      <div><p className="eyebrow">IDENTITY</p><h2>Display name</h2><p>Choose the commander name shown throughout Starfall Idle. This does not change your ChatGPT account name.</p></div>
+      <form onSubmit={submit}>
+        <label htmlFor="display-name">Commander display name</label>
+        <div><Input id="display-name" value={name} maxLength={32} autoComplete="nickname" onChange={(event) => setName(event.target.value)} placeholder={fallbackName} /><Button type="submit" disabled={name.trim() === state.displayName}>Save name</Button></div>
+        <small>{name.length} / 32 characters · Clear the field to use {fallbackName}.</small>
+      </form>
+    </section>
+
+    <section className="settings-panel account-settings panel">
+      <div><p className="eyebrow">ACCOUNT</p><h2>{signedIn ? "ChatGPT account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in to carry this character and patrol progress between devices."}</p></div>
+      {signedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+    </section>
+  </div>;
 }
 
 function StoryEvent({ eventId, onChoose }: { eventId: string; onChoose: (id: string) => void }) {
