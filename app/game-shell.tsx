@@ -95,13 +95,30 @@ const achievements = [
   { id: "untouchable", name: "Untouchable", met: (s: GameState) => s.combat.bestStreak >= 25 },
 ];
 
-const objectives = [
-  { id: "first-haul", name: "First Haul", description: "Store 25 Ferrite Ore", reward: "75 credits", met: (s: GameState) => s.inventory.ferrite >= 25, credits: 75 },
-  { id: "field-engineer", name: "Field Engineer", description: "Reach Metallurgy level 5", reward: "2 Power Cells", met: (s: GameState) => s.skills.metallurgy.level >= 5, item: "powerCell", amount: 2 },
-  { id: "beyond-erebus", name: "Beyond Erebus", description: "Travel to Helix Reach", reward: "120 credits", met: (s: GameState) => s.sectorId !== "erebus", credits: 120 },
-  { id: "away-team", name: "Away Team", description: "Complete an expedition", reward: "4 Drone Parts", met: (s: GameState) => s.completedExpeditions >= 1, item: "droneParts", amount: 4 },
-  { id: "archivist", name: "Archivist", description: "Record 8 discoveries", reward: "300 credits", met: (s: GameState) => s.collection.length >= 8, credits: 300 },
-  { id: "space-superiority", name: "Space Superiority", description: "Win 25 hostile encounters", reward: "8 Tactical Missiles", met: (s: GameState) => Object.values(s.combat.victories).reduce((a, b) => a + b, 0) >= 25, item: "missiles", amount: 8 },
+type Objective = { id: string; sector: string; name: string; description: string; reward: string; met: (state: GameState) => boolean; credits?: number; item?: string; amount?: number };
+const objectives: Objective[] = [
+  { id: "first-haul", sector: "Erebus Belt", name: "First Haul", description: "Store 25 Ferrite Ore", reward: "75 credits", met: (s) => s.inventory.ferrite >= 25, credits: 75 },
+  { id: "field-engineer", sector: "Erebus Belt", name: "Field Engineer", description: "Reach Metallurgy level 5", reward: "2 Power Cells", met: (s) => s.skills.metallurgy.level >= 5, item: "powerCell", amount: 2 },
+  { id: "belt-cleanup", sector: "Erebus Belt", name: "Belt Cleanup", description: "Store 80 Salvage", reward: "150 credits", met: (s) => s.inventory.salvage >= 80, credits: 150 },
+  { id: "beyond-erebus", sector: "Helix Reach", name: "Beyond Erebus", description: "Chart Helix Reach", reward: "120 credits", met: (s) => s.collection.includes("chart-helix"), credits: 120 },
+  { id: "quarantine-scholar", sector: "Helix Reach", name: "Quarantine Scholar", description: "Reach Science level 8", reward: "3 Bio-catalyst", met: (s) => s.skills.science.level >= 8, item: "catalyst", amount: 3 },
+  { id: "adaptive-crop", sector: "Helix Reach", name: "Adaptive Crop", description: "Complete 25 Xenobotany operations", reward: "6 Medkits", met: (s) => s.mastery.botany >= 25, item: "medicine", amount: 6 },
+  { id: "quarantine-secured", sector: "Helix Reach", name: "Quarantine Secured", description: "Defeat 5 Helix Security Automata", reward: "5 Circuits", met: (s) => (s.combat.victories["helix-automata"] ?? 0) >= 5, item: "circuits", amount: 5 },
+  { id: "cinder-chart", sector: "Cinder Expanse", name: "Through the Fire", description: "Chart the Cinder Expanse", reward: "4 Fuel Rods", met: (s) => s.collection.includes("chart-cinder"), item: "fuelRod", amount: 4 },
+  { id: "corsair-hunter", sector: "Cinder Expanse", name: "Corsair Hunter", description: "Defeat 10 Corsair Skiffs", reward: "10 Tactical Missiles", met: (s) => (s.combat.victories["corsair-skiff"] ?? 0) >= 10, item: "missiles", amount: 10 },
+  { id: "frontier-envoy", sector: "Cinder Expanse", name: "Frontier Envoy", description: "Reach Diplomacy level 10", reward: "300 credits", met: (s) => s.skills.diplomacy.level >= 10, credits: 300 },
+  { id: "contract-officer", sector: "Cinder Expanse", name: "Contract Officer", description: "Complete 4 faction contracts", reward: "8 Drone Parts", met: (s) => s.contractsCompleted.length >= 4, item: "droneParts", amount: 8 },
+  { id: "rift-entry", sector: "Orpheus Rift", name: "Enter the Rift", description: "Chart the Orpheus Rift", reward: "500 credits", met: (s) => s.collection.includes("chart-orpheus"), credits: 500 },
+  { id: "iridium-reserve", sector: "Orpheus Rift", name: "Iridium Reserve", description: "Store 25 Iridium", reward: "6 Alloy Plating", met: (s) => s.inventory.iridium >= 25, item: "plating", amount: 6 },
+  { id: "rift-historian", sector: "Orpheus Rift", name: "Rift Historian", description: "Reach Archaeology level 12", reward: "4 Relic Fragments", met: (s) => s.skills.archaeology.level >= 12, item: "relic", amount: 4 },
+  { id: "veteran-away-team", sector: "Orpheus Rift", name: "Veteran Away Team", description: "Complete 3 expeditions", reward: "750 credits", met: (s) => s.completedExpeditions >= 3, credits: 750 },
+  { id: "silent-arrival", sector: "Silent Systems", name: "The Long Silence", description: "Chart the Silent Systems", reward: "12 Power Cells", met: (s) => s.collection.includes("chart-silent"), item: "powerCell", amount: 12 },
+  { id: "combat-command", sector: "Silent Systems", name: "Combat Command", description: "Reach Combat level 20", reward: "15 Tactical Missiles", met: (s) => s.skills.combat.level >= 20, item: "missiles", amount: 15 },
+  { id: "machine-archive", sector: "Silent Systems", name: "Machine Archive", description: "Store 3 Ancient Artefacts", reward: "1,000 credits", met: (s) => s.inventory.artefact >= 3, credits: 1000 },
+  { id: "dreadnought-fall", sector: "Silent Systems", name: "Dreadnought Fall", description: "Defeat a Silent Dreadnought", reward: "2 Ancient Artefacts", met: (s) => (s.combat.victories["silent-dreadnought"] ?? 0) >= 1, item: "artefact", amount: 2 },
+  { id: "away-team", sector: "Patrol", name: "Away Team", description: "Complete an expedition", reward: "4 Drone Parts", met: (s) => s.completedExpeditions >= 1, item: "droneParts", amount: 4 },
+  { id: "archivist", sector: "Patrol", name: "Archivist", description: "Record 8 discoveries", reward: "300 credits", met: (s) => s.collection.length >= 8, credits: 300 },
+  { id: "space-superiority", sector: "Patrol", name: "Space Superiority", description: "Win 25 hostile encounters", reward: "8 Tactical Missiles", met: (s) => Object.values(s.combat.victories).reduce((a, b) => a + b, 0) >= 25, item: "missiles", amount: 8 },
 ];
 
 const marketGoods = ["ferrite", "salvage", "algae", "circuits", "medicine", "fuelRod"];
@@ -118,6 +135,10 @@ function duration(seconds: number) {
 function itemsText(items: Record<string, number>) {
   const entries = Object.entries(items);
   return entries.length ? entries.map(([id, amount]) => `${amount} ${itemNames[id] ?? id}`).join(" · ") : "No cargo";
+}
+function listText(values: string[]) {
+  if (values.length < 2) return values[0] ?? "an eligible sector";
+  return values.length === 2 ? `${values[0]} or ${values[1]}` : `${values.slice(0, -1).join(", ")}, or ${values.at(-1)}`;
 }
 function canAfford(state: GameState, costs: Record<string, number> = {}) {
   return Object.entries(costs).every(([id, amount]) => (state.inventory[id] ?? 0) >= amount);
@@ -186,11 +207,28 @@ function activityCosts(state: GameState, activity: SkillActivity) {
 function activityAvailable(state: GameState, activity: SkillActivity) {
   return !activity.sectors || activity.sectors.includes(state.sectorId);
 }
+function operationPauseReasons(state: GameState, activity: SkillActivity) {
+  const reasons: string[] = [];
+  if (state.skills[activity.skillId].level < activity.level) reasons.push(`Requires ${skillMeta[activity.skillId].name} level ${activity.level}; current level is ${state.skills[activity.skillId].level}`);
+  if (!activityAvailable(state, activity)) {
+    const destinations = (activity.sectors ?? []).map((id) => sectorById[id]?.name ?? id);
+    reasons.push(`Wrong sector: travel to ${listText(destinations)}`);
+  }
+  for (const [id, needed] of Object.entries(activityCosts(state, activity))) {
+    const held = state.inventory[id] ?? 0;
+    if (held < needed) reasons.push(`Missing ${needed - held} ${itemNames[id] ?? id} (${held}/${needed} ready)`);
+  }
+  if (activity.skillId === "combat" && !state.shields && state.hull <= state.maxHull * state.retreatAt / 100) {
+    reasons.push(`Auto-retreat engaged: hull is ${state.hull}/${state.maxHull} at the ${state.retreatAt}% threshold; repair hull or lower the threshold`);
+  }
+  return reasons;
+}
 function applyAchievements(state: GameState) {
   const earned = achievements.filter((entry) => entry.met(state)).map((entry) => entry.id);
   return { ...state, achievements: Array.from(new Set([...state.achievements, ...earned])) };
 }
 function completeActions(state: GameState, activity: SkillActivity, requested: number) {
+  if (state.skills[activity.skillId].level < activity.level) return { state, count: 0 };
   let count = Math.max(0, Math.floor(requested));
   const costs = activityCosts(state, activity);
   for (const [id, amount] of Object.entries(costs)) count = Math.min(count, Math.floor((state.inventory[id] ?? 0) / amount));
@@ -377,7 +415,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
         let next = completeExpedition(current);
         let completed = false;
         const activity = activityById[next.activeTask.activityId] ?? activities[0];
-        if (activityAvailable(next, activity) && canAfford(next, activityCosts(next, activity))) {
+        if (!operationPauseReasons(next, activity).length) {
           const progress = next.progress + 100 / (actionSeconds(next, activity) * 4);
           if (progress >= 100) {
             const result = completeActions({ ...next, progress: progress - 100 }, activity, 1);
@@ -386,7 +424,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
           } else next = { ...next, progress };
         }
         const combatActivity = next.combat.activeTaskId ? activityById[next.combat.activeTaskId] : null;
-        const combatReady = combatActivity?.skillId === "combat" && activityAvailable(next, combatActivity) && canAfford(next, activityCosts(next, combatActivity)) && (Boolean(next.shields) || next.hull > next.maxHull * next.retreatAt / 100);
+        const combatReady = combatActivity?.skillId === "combat" && !operationPauseReasons(next, combatActivity).length;
         if (combatActivity && combatReady) {
           const progress = next.combat.progress + 100 / (actionSeconds(next, combatActivity) * 4);
           if (progress >= 100) {
@@ -450,7 +488,8 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
   const active = activityById[state.activeTask.activityId] ?? activities[0];
   const activeSkill = state.skills[active.skillId];
   const activeSector = sectorById[state.sectorId] ?? sectors[0];
-  const activeBlocked = !canAfford(state, activityCosts(state, active)) || !activityAvailable(state, active) || (Boolean(active.damage) && !state.shields && state.hull <= state.maxHull * state.retreatAt / 100);
+  const activePauseReasons = operationPauseReasons(state, active);
+  const activeBlocked = activePauseReasons.length > 0;
   const xpStart = xpForLevel(activeSkill.level);
   const xpEnd = activeSkill.level === 99 ? activeSkill.xp : xpForLevel(activeSkill.level + 1);
   const xpProgress = activeSkill.level === 99 ? 100 : (activeSkill.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
@@ -618,7 +657,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
           <div className="operation-body">
             <div className="operation-heading"><div><p className="eyebrow">ACTIVE · {skillMeta[active.skillId].name.toUpperCase()} · {activeSector.name.toUpperCase()}</p><h2>{active.name}</h2></div><span className="level-chip">LV {activeSkill.level}</span></div>
             <Progress value={activeBlocked ? 0 : state.progress} className="operation-progress" />
-            <div className="operation-meta"><span>{activeBlocked ? "Operation paused — check location, materials or retreat threshold" : `${Math.floor(state.progress)}% · ${actionSeconds(state, active).toFixed(1)}s action`}</span><span>{active.xp} XP · {itemsText(active.produces)}</span></div>
+            <div className="operation-meta"><span>{activeBlocked ? `Paused — ${activePauseReasons.join(" · ")}` : `${Math.floor(state.progress)}% · ${actionSeconds(state, active).toFixed(1)}s action`}</span><span>{active.xp} XP · {itemsText(active.produces)}</span></div>
           </div>
         </section>
 
@@ -666,10 +705,11 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
 }
 
 function SkillView({ state, skillId, activeId, onStart }: { state: GameState; skillId: SkillId; activeId: string; onStart: (activity: SkillActivity) => void }) {
-  return <div className="activity-list">{activities.filter((entry) => entry.skillId === skillId).map((activity) => {
+  return <div className="activity-list">{activities.filter((entry) => entry.skillId === skillId).sort((a, b) => a.level - b.level).map((activity) => {
     const locked = state.skills[skillId].level < activity.level;
     const wrongSector = !activityAvailable(state, activity);
-    return <button key={activity.id} className={`activity-row panel ${activeId === activity.id ? "running" : ""}`} disabled={locked || wrongSector} onClick={() => onStart(activity)}><span className="activity-level">{locked ? <LockKeyhole /> : <CircleGauge />}<b>LV {activity.level}</b></span><span className="activity-copy"><strong>{activity.name}</strong><small>{activity.description}</small><em>{activity.consumes ? `Uses: ${itemsText(activity.consumes)} · ` : ""}Yields: {itemsText(activity.produces)}{activity.credits ? ` · ${activity.credits} credits` : ""}</em>{wrongSector ? <i>Unavailable in this sector</i> : null}</span><span className="activity-action"><b>{activity.seconds}s</b><small>{activity.xp} XP</small><ChevronRight /></span></button>;
+    const destinations = (activity.sectors ?? []).map((id) => sectorById[id]?.name ?? id);
+    return <button key={activity.id} className={`activity-row panel ${activeId === activity.id ? "running" : ""}`} disabled={locked || wrongSector} onClick={() => onStart(activity)}><span className="activity-level">{locked ? <LockKeyhole /> : <CircleGauge />}<b>LV {activity.level}</b></span><span className="activity-copy"><strong>{activity.name}</strong><small>{activity.description}</small><em>{activity.consumes ? `Uses: ${itemsText(activity.consumes)} · ` : ""}Yields: {itemsText(activity.produces)}{activity.credits ? ` · ${activity.credits} credits` : ""}</em>{locked ? <i>Requires {skillMeta[skillId].name} level {activity.level}</i> : wrongSector ? <i>Travel to {listText(destinations)}</i> : null}</span><span className="activity-action"><b>{activity.seconds}s</b><small>{activity.xp} XP</small><ChevronRight /></span></button>;
   })}</div>;
 }
 
@@ -701,7 +741,8 @@ function CombatView({ state, onUpgrade, onRetreat, onRepair, onDoctrine, onEngag
   const targets = activities.filter((entry) => entry.skillId === "combat" && entry.enemy);
   const activeCandidate = state.combat.activeTaskId ? activityById[state.combat.activeTaskId] : null;
   const activeTarget = activeCandidate?.skillId === "combat" ? activeCandidate : null;
-  const combatPaused = activeTarget ? !activityAvailable(state, activeTarget) || !canAfford(state, activityCosts(state, activeTarget)) || (!state.shields && state.hull <= state.maxHull * state.retreatAt / 100) : false;
+  const combatPauseReasons = activeTarget ? operationPauseReasons(state, activeTarget) : [];
+  const combatPaused = combatPauseReasons.length > 0;
   const totalVictories = Object.values(state.combat.victories).reduce((a, b) => a + b, 0);
   const milestones = [
     [5, "Targeting Suite", "+5% hit chance"], [10, "Overcharge", "Aggressive stance attacks faster"],
@@ -719,7 +760,7 @@ function CombatView({ state, onUpgrade, onRetreat, onRepair, onDoctrine, onEngag
     <section className={`combat-operation panel ${activeTarget ? "active" : ""}`}>
       <div><p className="eyebrow">VESSEL COMBAT · LEVEL {state.skills.combat.level} · {fmt(state.skills.combat.xp)} XP · RUNS IN PARALLEL</p><h2>{activeTarget ? `Engaging ${activeTarget.name}` : "No hostile target selected"}</h2><p>{activeTarget ? `Combat continues while ${skillMeta[state.activeTask.skillId].name} trains independently.` : "Choose a target below. Your Skill Matrix activity will continue uninterrupted."}</p></div>
       <Progress value={activeTarget ? state.combat.progress : 0} />
-      <strong>{activeTarget ? combatPaused ? "Paused · check ammunition, sector or retreat threshold" : `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s encounter` : "Fire control standing by"}</strong>
+      <strong>{activeTarget ? combatPaused ? `Paused · ${combatPauseReasons.join(" · ")}` : `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s encounter` : "Fire control standing by"}</strong>
       {activeTarget ? <Button variant="outline" onClick={onStop}>Disengage</Button> : null}
     </section>
     <section className="combat-control panel">
@@ -763,7 +804,7 @@ function ContractView({ state, onComplete }: { state: GameState; onComplete: (id
 }
 
 function ObjectiveView({ state, onClaim }: { state: GameState; onClaim: (id: string) => void }) {
-  return <div className="research-tree">{objectives.map((objective, index) => { const claimed = state.claimedObjectives.includes(objective.id); const met = objective.met(state); return <article key={objective.id} className={`research-node panel ${claimed ? "unlocked" : ""}`}><span>{claimed ? <Check /> : index + 1}</span><div><p className="eyebrow">{claimed ? "COMPLETED" : "PATROL OBJECTIVE"}</p><h3>{objective.name}</h3><p>{objective.description}</p><small>Reward: {objective.reward}</small></div><Button disabled={!met || claimed} onClick={() => onClaim(objective.id)}>{claimed ? "Claimed" : met ? "Claim" : "In progress"}</Button></article>; })}</div>;
+  return <div className="research-tree">{objectives.map((objective, index) => { const claimed = state.claimedObjectives.includes(objective.id); const met = objective.met(state); return <article key={objective.id} className={`research-node panel ${claimed ? "unlocked" : ""}`}><span>{claimed ? <Check /> : index + 1}</span><div><p className="eyebrow">{claimed ? `COMPLETED · ${objective.sector.toUpperCase()}` : objective.sector.toUpperCase()}</p><h3>{objective.name}</h3><p>{objective.description}</p><small>Reward: {objective.reward}</small></div><Button disabled={!met || claimed} onClick={() => onClaim(objective.id)}>{claimed ? "Claimed" : met ? "Claim" : "In progress"}</Button></article>; })}</div>;
 }
 
 function ResearchView({ state, onUnlock }: { state: GameState; onUnlock: (id: string) => void }) {

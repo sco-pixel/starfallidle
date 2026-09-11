@@ -4,14 +4,14 @@ A mobile-friendly science-fiction idle RPG inspired by skill-based progression g
 
 ## Current gameplay
 
-- 14 trainable skills with levels, XP, mastery, unlocks, and interdependent resources
+- 14 trainable skills with 84 operations, levels, XP, mastery, unlocks, and interdependent resources
 - Five explorable sectors with travel requirements and location-specific activities
 - Nine upgradeable cruiser systems across the Aethelgard
 - Ten assignable crew specialists
 - Mining, salvage, survey, cargo, and combat drones
 - Constructible planetary rover and boarding shuttle
 - Equipment loadouts, shields, hull damage, and automatic combat retreat
-- Timed expeditions, faction contracts, sector objectives, and station markets
+- Timed expeditions, faction contracts, 22 sector objectives, and station markets
 - Research tree, discovery collection, achievements, story events, and patrol prestige
 - Capped offline progression with detailed return reports
 - Device-local guest saves and per-user D1 cloud saves through optional Sign in with ChatGPT

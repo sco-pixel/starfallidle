@@ -83,6 +83,65 @@ export const activities: Activity[] = [
   { id: "corsair-parley", skillId: "diplomacy", name: "Corsair Parley", level: 8, seconds: 10, xp: 34, description: "Negotiate passage through a contested system.", consumes: { relic: 1 }, produces: { data: 2 }, credits: 22, sectors: ["cinder"], collectionId: "accord-corsair" },
   { id: "colony-ruins", skillId: "archaeology", name: "Colony Ruins", level: 1, seconds: 6, xp: 14, description: "Catalogue abandoned frontier technology.", consumes: { data: 1 }, produces: { relic: 1 }, collectionId: "ruin-colony" },
   { id: "alien-vault", skillId: "archaeology", name: "Alien Vault", level: 9, seconds: 11, xp: 38, description: "Reconstruct machinery from a sealed structure.", consumes: { relic: 3, powerCell: 1 }, produces: { artefact: 1 }, sectors: ["orpheus", "silent"], collectionId: "ruin-vault" },
+
+  { id: "nickel-asteroid", skillId: "mining", name: "Nickel-Iron Asteroid", level: 3, seconds: 4, xp: 13, description: "Break down a dense metallic asteroid for mixed industrial ore.", produces: { ferrite: 4, cobalt: 1 } },
+  { id: "helix-crystal", skillId: "mining", name: "Helix Crystal Shelf", level: 8, seconds: 6, xp: 24, description: "Extract conductive crystals beneath the quarantine debris.", produces: { cobalt: 3, data: 1 }, sectors: ["helix", "orpheus", "silent"] },
+  { id: "rift-iridium", skillId: "mining", name: "Rift Iridium Deposit", level: 20, seconds: 12, xp: 58, description: "Stabilise and mine ore warped by the Orpheus fracture.", produces: { iridium: 4, cobalt: 3 }, sectors: ["orpheus", "silent"] },
+
+  { id: "lifeboat-recovery", skillId: "salvage", name: "Abandoned Lifeboat", level: 3, seconds: 5, xp: 15, description: "Recover emergency stores from an old evacuation craft.", produces: { salvage: 3, rations: 1 }, credits: 3 },
+  { id: "helix-lab-wreck", skillId: "salvage", name: "Helix Laboratory Wreck", level: 9, seconds: 8, xp: 30, description: "Strip protected research hardware from a ruined laboratory.", produces: { circuits: 2, data: 2, salvage: 3 }, credits: 8, sectors: ["helix", "orpheus", "silent"] },
+  { id: "sentinel-carcass", skillId: "salvage", name: "Sentinel Carcass", level: 20, seconds: 13, xp: 60, description: "Dismantle an ancient machine without reactivating its core.", produces: { plating: 3, relic: 2, circuits: 4 }, credits: 20, sectors: ["silent"] },
+
+  { id: "protein-moss", skillId: "botany", name: "Protein Moss Beds", level: 3, seconds: 5, xp: 14, description: "Cultivate a resilient staple crop for long patrols.", consumes: { algae: 2 }, produces: { rations: 2 } },
+  { id: "medicinal-lichen", skillId: "botany", name: "Medicinal Lichen", level: 8, seconds: 8, xp: 29, description: "Grow quarantine lichen rich in useful organic compounds.", consumes: { algae: 4 }, produces: { catalyst: 2, medicine: 1 }, sectors: ["helix", "orpheus", "silent"] },
+  { id: "void-orchard", skillId: "botany", name: "Void Orchard", level: 20, seconds: 13, xp: 59, description: "Maintain fruiting xenoflora adapted to machine-world radiation.", consumes: { algae: 8, catalyst: 1 }, produces: { rations: 7, catalyst: 3, relic: 1 }, sectors: ["silent"] },
+
+  { id: "circuit-refit", skillId: "engineering", name: "Circuit Refit", level: 4, seconds: 6, xp: 18, description: "Rebuild damaged control boards from stripped components.", consumes: { salvage: 4 }, produces: { circuits: 2 } },
+  { id: "shield-capacitor", skillId: "engineering", name: "Shield Capacitor", level: 10, seconds: 10, xp: 36, description: "Fabricate a reserve capacitor for the cruiser deflectors.", consumes: { cobalt: 4, plating: 2, circuits: 2 }, produces: { powerCell: 2 } },
+  { id: "phase-lattice", skillId: "engineering", name: "Phase Lattice", level: 20, seconds: 14, xp: 64, description: "Assemble a precision frame for Silent Systems technology.", consumes: { iridium: 3, relic: 2, circuits: 5 }, produces: { navData: 5, artefact: 1 }, sectors: ["silent"] },
+
+  { id: "cobalt-laminate", skillId: "metallurgy", name: "Cobalt Laminate", level: 3, seconds: 6, xp: 19, description: "Press cobalt into heat-resistant structural layers.", consumes: { ferrite: 3, cobalt: 2 }, produces: { plating: 2 } },
+  { id: "relic-alloy", skillId: "metallurgy", name: "Relic-Bonded Alloy", level: 20, seconds: 14, xp: 65, description: "Bond iridium around fragments of non-human material.", consumes: { iridium: 3, relic: 2 }, produces: { plating: 5, artefact: 1 }, sectors: ["silent"] },
+
+  { id: "nutrient-gel", skillId: "biochemistry", name: "Nutrient Gel", level: 3, seconds: 6, xp: 18, description: "Concentrate algae into stable emergency nutrition.", consumes: { algae: 3 }, produces: { rations: 3 } },
+  { id: "quarantine-antiviral", skillId: "biochemistry", name: "Quarantine Antiviral", level: 10, seconds: 9, xp: 35, description: "Adapt old Helix treatments to living xenopathogens.", consumes: { catalyst: 2, data: 2 }, produces: { medicine: 4 }, sectors: ["helix", "orpheus", "silent"] },
+  { id: "cryogenic-enzyme", skillId: "biochemistry", name: "Cryogenic Enzyme", level: 20, seconds: 14, xp: 63, description: "Synthesize a regenerative compound stable near absolute zero.", consumes: { catalyst: 4, relic: 2 }, produces: { medicine: 8, rations: 2 }, sectors: ["silent"] },
+
+  { id: "beacon-analysis", skillId: "science", name: "Beacon Analysis", level: 3, seconds: 6, xp: 17, description: "Decode traffic patterns from neglected navigation beacons.", produces: { data: 3, navData: 1 } },
+  { id: "xenoflora-genome", skillId: "science", name: "Xenoflora Genome", level: 9, seconds: 9, xp: 34, description: "Sequence the adaptive mechanisms of Helix plant life.", consumes: { algae: 3, data: 2 }, produces: { catalyst: 2, data: 3 }, sectors: ["helix", "orpheus", "silent"] },
+  { id: "sentinel-core-study", skillId: "science", name: "Sentinel Core Study", level: 20, seconds: 15, xp: 68, description: "Interrogate a dormant machine intelligence under containment.", consumes: { relic: 3, powerCell: 2 }, produces: { data: 10, artefact: 1 }, sectors: ["silent"] },
+
+  { id: "crew-wellness", skillId: "medicine", name: "Crew Wellness Round", level: 3, seconds: 6, xp: 17, description: "Run preventative checks across the ten-person crew.", consumes: { rations: 1 }, produces: {} },
+  { id: "trauma-surgery", skillId: "medicine", name: "Trauma Surgery Drill", level: 5, seconds: 7, xp: 24, description: "Practise stabilising severe boarding-action injuries.", consumes: { medicine: 2 }, produces: {} },
+  { id: "quarantine-inoculation", skillId: "medicine", name: "Quarantine Inoculation", level: 11, seconds: 10, xp: 39, description: "Protect the crew against Helix biological hazards.", consumes: { medicine: 3, catalyst: 1 }, produces: {}, sectors: ["helix", "orpheus", "silent"] },
+  { id: "stasis-revival", skillId: "medicine", name: "Stasis Revival Protocol", level: 20, seconds: 14, xp: 64, description: "Rehearse revival procedures using recovered machine medicine.", consumes: { medicine: 5, relic: 1 }, produces: {}, sectors: ["silent"] },
+
+  { id: "silent-dreadnought", skillId: "combat", name: "Silent Dreadnought", level: 22, seconds: 21, xp: 92, description: "Break the layered defences of a machine command vessel.", consumes: { rations: 3, powerCell: 2 }, produces: { relic: 4, plating: 3 }, credits: 85, damage: 38, sectors: ["silent"], enemy: { hull: 260, shields: 90, armor: 42, evasion: 12, class: "Dreadnought", weakness: "railgun", rareEvery: 30, rareDrop: { artefact: 2, missiles: 8 } }, collectionId: "enemy-dreadnought" },
+
+  { id: "shipping-lanes", skillId: "astrogation", name: "Shipping Lane Survey", level: 3, seconds: 6, xp: 18, description: "Optimise safe commercial routes around Erebus traffic.", produces: { navData: 3 }, credits: 5 },
+  { id: "quarantine-route", skillId: "astrogation", name: "Quarantine Route", level: 6, seconds: 8, xp: 27, description: "Chart a path through the Helix exclusion perimeter.", consumes: { data: 2 }, produces: { navData: 4 }, sectors: ["helix", "orpheus", "silent"] },
+  { id: "corsair-lanes", skillId: "astrogation", name: "Corsair Smuggling Lanes", level: 12, seconds: 11, xp: 43, description: "Map hidden routes through raider-controlled space.", consumes: { data: 3 }, produces: { navData: 6 }, credits: 14, sectors: ["cinder", "orpheus", "silent"] },
+  { id: "silent-gate-vector", skillId: "astrogation", name: "Silent Gate Vector", level: 20, seconds: 15, xp: 67, description: "Calculate a repeatable approach to a dormant machine gate.", consumes: { data: 5, relic: 2 }, produces: { navData: 10 }, sectors: ["silent"] },
+
+  { id: "salvage-swarm", skillId: "drones", name: "Salvage Swarm", level: 4, seconds: 6, xp: 19, description: "Coordinate cutters across a fragmented debris field.", consumes: { droneParts: 1 }, produces: { salvage: 6 } },
+  { id: "cargo-swarm", skillId: "drones", name: "Cargo Relay Swarm", level: 8, seconds: 9, xp: 32, description: "Move supplies between the cruiser and a remote station.", consumes: { powerCell: 1 }, produces: { salvage: 3, circuits: 2 }, credits: 10 },
+  { id: "interceptor-swarm", skillId: "drones", name: "Interceptor Screen", level: 12, seconds: 11, xp: 44, description: "Run autonomous defensive formations around the cruiser.", consumes: { droneParts: 2, powerCell: 1 }, produces: { missiles: 2 }, sectors: ["cinder", "orpheus", "silent"] },
+  { id: "autonomous-fleet", skillId: "drones", name: "Autonomous Fleet", level: 20, seconds: 15, xp: 68, description: "Coordinate independent drone wings through machine space.", consumes: { droneParts: 3, powerCell: 2 }, produces: { data: 6, relic: 2, salvage: 5 }, sectors: ["silent"] },
+
+  { id: "medical-supply-run", skillId: "logistics", name: "Medical Supply Run", level: 3, seconds: 6, xp: 17, description: "Deliver urgent medical stores across Erebus Station.", consumes: { medicine: 1 }, produces: {}, credits: 12 },
+  { id: "ore-freight", skillId: "logistics", name: "Ore Freight Contract", level: 5, seconds: 7, xp: 23, description: "Consolidate refinery ore into a profitable shipment.", consumes: { ferrite: 8 }, produces: { plating: 1 }, credits: 15 },
+  { id: "blockade-run", skillId: "logistics", name: "Cinder Blockade Run", level: 12, seconds: 11, xp: 43, description: "Move supplies through a shifting corsair interdiction line.", consumes: { rations: 2, fuelRod: 1 }, produces: { circuits: 4 }, credits: 42, sectors: ["cinder", "orpheus", "silent"] },
+  { id: "machine-relay-supply", skillId: "logistics", name: "Machine Relay Supply", level: 20, seconds: 15, xp: 66, description: "Maintain an isolated forward relay inside the Silent Systems.", consumes: { rations: 3, fuelRod: 1, medicine: 1 }, produces: { data: 5, relic: 1 }, credits: 65, sectors: ["silent"] },
+
+  { id: "prospector-charter", skillId: "diplomacy", name: "Prospector Charter", level: 3, seconds: 7, xp: 18, description: "Negotiate shared extraction rights in the Erebus Belt.", consumes: { ferrite: 3 }, produces: {}, credits: 14 },
+  { id: "helix-arbitration", skillId: "diplomacy", name: "Helix Arbitration", level: 6, seconds: 9, xp: 28, description: "Mediate access between researchers and quarantine crews.", consumes: { data: 2 }, produces: { medicine: 1 }, credits: 20, sectors: ["helix"] },
+  { id: "frontier-treaty", skillId: "diplomacy", name: "Frontier Defence Treaty", level: 12, seconds: 12, xp: 45, description: "Coordinate a mutual-defence compact against corsair raids.", consumes: { rations: 2, data: 3 }, produces: { navData: 3 }, credits: 38, sectors: ["cinder", "orpheus"] },
+  { id: "machine-translation", skillId: "diplomacy", name: "Machine Translation", level: 20, seconds: 16, xp: 70, description: "Attempt structured communication with a Sentinel chorus.", consumes: { data: 6, relic: 2 }, produces: { artefact: 1 }, credits: 60, sectors: ["silent"] },
+
+  { id: "derelict-archive", skillId: "archaeology", name: "Derelict Archive", level: 4, seconds: 7, xp: 21, description: "Reconstruct civilian records from a damaged memory core.", consumes: { data: 2 }, produces: { relic: 2 } },
+  { id: "helix-strata", skillId: "archaeology", name: "Helix Laboratory Strata", level: 7, seconds: 9, xp: 31, description: "Separate layers of experiments performed across decades.", consumes: { data: 3 }, produces: { relic: 2, catalyst: 1 }, sectors: ["helix", "orpheus", "silent"] },
+  { id: "corsair-reliquary", skillId: "archaeology", name: "Corsair Reliquary", level: 13, seconds: 12, xp: 47, description: "Catalogue stolen relics accumulated by a raider dynasty.", consumes: { relic: 2, data: 2 }, produces: { artefact: 1 }, sectors: ["cinder", "silent"] },
+  { id: "sentinel-city", skillId: "archaeology", name: "Sentinel City Survey", level: 20, seconds: 16, xp: 72, description: "Map the cultural layers beneath an active machine metropolis.", consumes: { relic: 4, powerCell: 2 }, produces: { artefact: 2, data: 6 }, sectors: ["silent"] },
 ];
 
 export const sectors = [
@@ -187,7 +246,7 @@ export const collectionEntries = [
   ["alloy-missile", "Guidance Warhead", "Resources"],
   ["wreck-courier", "Courier Wreck", "Derelicts"], ["wreck-relay", "Silent Relay", "Derelicts"], ["wreck-dreadnought", "Lost Dreadnought", "Derelicts"],
   ["flora-algae", "Vacuum Algae", "Xenoflora"], ["flora-kelp", "Helix Kelp", "Xenoflora"], ["flora-spore", "Singing Spore", "Xenoflora"],
-  ["enemy-scavenger", "Scavenger Drone", "Hostiles"], ["enemy-automata", "Helix Automata", "Hostiles"], ["enemy-corsair", "Corsair Skiff", "Hostiles"], ["enemy-frigate", "Corsair Frigate", "Hostiles"], ["enemy-sentinel", "Void Sentinel", "Hostiles"],
+  ["enemy-scavenger", "Scavenger Drone", "Hostiles"], ["enemy-automata", "Helix Automata", "Hostiles"], ["enemy-corsair", "Corsair Skiff", "Hostiles"], ["enemy-frigate", "Corsair Frigate", "Hostiles"], ["enemy-sentinel", "Void Sentinel", "Hostiles"], ["enemy-dreadnought", "Silent Dreadnought", "Hostiles"],
   ["ruin-colony", "Colony Tablet", "Relics"], ["ruin-vault", "Vault Mechanism", "Relics"], ["expedition-structure", "Structure Survey", "Expeditions"],
   ["expedition-gate", "Restored Jump Gate", "Expeditions"], ["chart-rift", "Rift Chart", "Navigation"], ["accord-corsair", "Corsair Accord", "Diplomacy"],
 ] as const;
