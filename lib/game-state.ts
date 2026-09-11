@@ -25,7 +25,7 @@ export type CombatState = {
 };
 
 export type GameState = {
-  version: 3;
+  version: 4;
   credits: number;
   skills: Record<SkillId, SkillProgress>;
   mastery: Record<SkillId, number>;
@@ -66,22 +66,59 @@ const startingInventory: Record<string, number> = {
   catalyst: 0, navData: 0, droneParts: 0, fuelRod: 2, artefact: 0, missiles: 6,
 };
 
+export const MAX_SKILL_LEVEL = 100;
+
+// Starfall's progression curve: quick qualifications at low levels, followed by
+// a long exponential specialist journey. Thresholds are cumulative XP.
+const XP_THRESHOLDS = Array.from({ length: MAX_SKILL_LEVEL + 1 }, (_, index) => {
+  if (index <= 1) return 0;
+  let total = 0;
+  for (let rank = 1; rank < index; rank += 1) {
+    total += Math.floor(50 + 18 * Math.pow(rank, 1.55) + 32 * Math.pow(1.11, rank));
+  }
+  return total;
+});
+
 export function xpForLevel(level: number) {
-  if (level <= 1) return 0;
-  return Math.floor(55 * Math.pow(level - 1, 1.65));
+  const boundedLevel = Math.max(1, Math.min(MAX_SKILL_LEVEL, Math.floor(level)));
+  return XP_THRESHOLDS[boundedLevel];
 }
 
 export function levelFromXp(xp: number) {
   let level = 1;
-  while (level < 99 && xp >= xpForLevel(level + 1)) level += 1;
+  while (level < MAX_SKILL_LEVEL && xp >= xpForLevel(level + 1)) level += 1;
   return level;
+}
+
+function legacyXpForLevel(level: number) {
+  if (level <= 1) return 0;
+  return Math.floor(55 * Math.pow(level - 1, 1.65));
+}
+
+function legacyLevelFromXp(xp: number) {
+  let level = 1;
+  while (level < 99 && xp >= legacyXpForLevel(level + 1)) level += 1;
+  return level;
+}
+
+function migrateSkillXp(raw: Record<string, unknown>, saveVersion: number) {
+  const rawXp = boundedNumber(raw.xp, 0);
+  if (saveVersion >= 4) return rawXp;
+
+  const legacyLevel = Math.max(1, Math.min(99, boundedNumber(raw.level, legacyLevelFromXp(rawXp), 99)));
+  const oldStart = legacyXpForLevel(legacyLevel);
+  const oldEnd = legacyXpForLevel(legacyLevel + 1);
+  const progress = Math.max(0, Math.min(1, (rawXp - oldStart) / Math.max(1, oldEnd - oldStart)));
+  const newStart = xpForLevel(legacyLevel);
+  const newEnd = xpForLevel(legacyLevel + 1);
+  return newStart + Math.floor(progress * (newEnd - newStart));
 }
 
 export function defaultGameState(): GameState {
   const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, { xp: 0, level: 1 }])) as Record<SkillId, SkillProgress>;
   const mastery = Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>;
   return {
-    version: 3,
+    version: 4,
     credits: 180,
     skills,
     mastery,
@@ -147,10 +184,11 @@ export function sanitizeGameState(value: unknown): GameState {
   const expeditionInput = input.activeExpedition && typeof input.activeExpedition === "object" ? input.activeExpedition as Record<string, unknown> : null;
   const combatInput = input.combat && typeof input.combat === "object" ? input.combat as Record<string, unknown> : {};
   const victoriesInput = combatInput.victories && typeof combatInput.victories === "object" ? combatInput.victories as Record<string, unknown> : {};
+  const saveVersion = boundedNumber(input.version, 0, 4);
 
   const skills = Object.fromEntries(SKILL_IDS.map((id) => {
     const raw = skillsInput[id] && typeof skillsInput[id] === "object" ? skillsInput[id] as Record<string, unknown> : {};
-    const xp = boundedNumber(raw.xp, 0);
+    const xp = migrateSkillXp(raw, saveVersion);
     return [id, { xp, level: levelFromXp(xp) }];
   })) as Record<SkillId, SkillProgress>;
   const mastery = Object.fromEntries(SKILL_IDS.map((id) => [id, boundedNumber(masteryInput[id], 0, 1_000_000)])) as Record<SkillId, number>;
@@ -165,7 +203,7 @@ export function sanitizeGameState(value: unknown): GameState {
   const skillId: SkillId = rawSkillId === "combat" ? "mining" : rawSkillId;
 
   return {
-    version: 3,
+    version: 4,
     credits: boundedNumber(input.credits, defaults.credits),
     skills,
     mastery,

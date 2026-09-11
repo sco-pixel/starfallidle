@@ -4,7 +4,7 @@ A mobile-friendly science-fiction idle RPG inspired by skill-based progression g
 
 ## Current gameplay
 
-- 14 trainable skills with 84 operations, levels, XP, mastery, unlocks, and interdependent resources
+- 14 trainable skills with 84 operations, an original accelerating XP curve to level 100, mastery, unlocks, and interdependent resources
 - Five explorable sectors with travel requirements and location-specific activities
 - Nine upgradeable cruiser systems across the Aethelgard
 - Ten assignable crew specialists

@@ -26,7 +26,7 @@ import {
   storyEvents, totalLevel, type Activity as SkillActivity,
 } from "@/lib/game-content";
 import {
-  SKILL_IDS, defaultGameState, levelFromXp, sanitizeGameState, xpForLevel,
+  MAX_SKILL_LEVEL, SKILL_IDS, defaultGameState, levelFromXp, sanitizeGameState, xpForLevel,
   type CombatStance, type CombatWeapon, type DroneId, type EquipmentId, type GameState, type ShipModuleId, type SkillId, type VehicleId,
 } from "@/lib/game-state";
 
@@ -490,9 +490,10 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
   const activeSector = sectorById[state.sectorId] ?? sectors[0];
   const activePauseReasons = operationPauseReasons(state, active);
   const activeBlocked = activePauseReasons.length > 0;
-  const xpStart = xpForLevel(activeSkill.level);
-  const xpEnd = activeSkill.level === 99 ? activeSkill.xp : xpForLevel(activeSkill.level + 1);
-  const xpProgress = activeSkill.level === 99 ? 100 : (activeSkill.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
+  const selectedProgress = state.skills[selectedSkill];
+  const xpStart = xpForLevel(selectedProgress.level);
+  const xpEnd = selectedProgress.level === MAX_SKILL_LEVEL ? selectedProgress.xp : xpForLevel(selectedProgress.level + 1);
+  const xpProgress = selectedProgress.level === MAX_SKILL_LEVEL ? 100 : (selectedProgress.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
 
   const travel = (sectorId: string) => updateState((current) => {
     const destination = sectorById[sectorId];
@@ -661,7 +662,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, signInPath }:
           </div>
         </section>
 
-        <header className="content-heading v3-heading"><div><p className="eyebrow">{view === "skills" ? skillMeta[selectedSkill].group.toUpperCase() + " SKILL" : "COMMAND CONSOLE"}</p><h1>{viewTitle[view][0]}</h1><p>{viewTitle[view][1]}</p></div>{view === "skills" ? <div className="xp-block"><strong>Level {state.skills[selectedSkill].level}</strong><span>{fmt(state.skills[selectedSkill].xp)} XP · {fmt(state.mastery[selectedSkill])} mastery</span><Progress value={selectedSkill === active.skillId ? xpProgress : 0} /></div> : null}</header>
+        <header className="content-heading v3-heading"><div><p className="eyebrow">{view === "skills" ? skillMeta[selectedSkill].group.toUpperCase() + " SKILL" : "COMMAND CONSOLE"}</p><h1>{viewTitle[view][0]}</h1><p>{viewTitle[view][1]}</p></div>{view === "skills" ? <div className="xp-block"><strong>Level {state.skills[selectedSkill].level}</strong><span>{fmt(state.skills[selectedSkill].xp)} XP · {fmt(state.mastery[selectedSkill])} mastery</span><Progress value={xpProgress} /></div> : null}</header>
 
         {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
