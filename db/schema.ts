@@ -33,3 +33,13 @@ export const hiscores = sqliteTable("hiscores", {
   index("idx_hiscores_weekly_xp").on(table.weeklyXp),
   index("idx_hiscores_display_name").on(table.displayName),
 ]);
+
+export const firebaseAccounts = sqliteTable("firebase_accounts", {
+  firebaseUid: text("firebase_uid").primaryKey(),
+  userId: text("user_id").notNull().unique(),
+  email: text("email"),
+  displayName: text("display_name"),
+  linkedAt: text("linked_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_firebase_accounts_email").on(table.email),
+]);

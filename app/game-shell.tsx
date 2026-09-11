@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { signInWithPopup } from "firebase/auth";
 import {
   Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
@@ -31,6 +32,7 @@ import {
   MAX_SKILL_LEVEL, SKILL_IDS, defaultGameState, levelFromXp, sanitizeGameState, xpForLevel,
   type CombatStance, type CombatWeapon, type DroneId, type EquipmentId, type GameState, type OutpostType, type PowerMode, type ResearchPath, type ShipModuleId, type SkillId, type StatusEffect, type VehicleId,
 } from "@/lib/game-state";
+import { firebaseAuth, firebaseGoogleProvider } from "@/lib/firebase-client";
 
 declare global {
   interface Document {
@@ -464,6 +466,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [offlineReport, setOfflineReport] = useState<OfflineReport | null>(null);
   const [guestImport, setGuestImport] = useState<GameState | null>(null);
+  const [firebaseLink, setFirebaseLink] = useState<{ status: "idle" | "linking" | "linked" | "error"; message: string }>({ status: "idle", message: "" });
   const [now, setNow] = useState(initialState.lastActiveAt);
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
@@ -471,6 +474,28 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const pendingSave = useRef(false);
   const cloudSaveEnabled = useRef(!signedIn);
   useEffect(() => { stateRef.current = state; }, [state]);
+
+  const linkGoogleAccount = useCallback(async () => {
+    if (!signedIn) return;
+    setFirebaseLink({ status: "linking", message: "Opening Google sign-in…" });
+    try {
+      const result = await signInWithPopup(firebaseAuth, firebaseGoogleProvider);
+      const token = await result.user.getIdToken();
+      const response = await fetch("/api/firebase/link", {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = await response.json() as { error?: string; email?: string };
+      if (!response.ok) throw new Error(body.error ?? "Unable to link Google.");
+      setFirebaseLink({
+        status: "linked",
+        message: `${body.email ?? result.user.email ?? "Google account"} linked to this commander.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Google linking was cancelled or unavailable.";
+      setFirebaseLink({ status: "error", message });
+    }
+  }, [signedIn]);
 
   const persist = useCallback(async (next: GameState) => {
     if (!signedIn || !saveAvailable || !cloudSaveEnabled.current) return;
@@ -917,7 +942,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
         {view === "outposts" ? <OutpostView state={state} onDevelop={developOutpost} /> : null}
         {view === "missions" ? <MissionView state={state} onClaim={claimMission} /> : null}
         {view === "hiscores" ? <HiscoresView signedIn={signedIn} signInPath={signInPath} /> : null}
-        {view === "character" ? <CharacterView state={state} fallbackName={accountName} email={accountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
+        {view === "character" ? <CharacterView state={state} fallbackName={accountName} email={accountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} firebaseLink={firebaseLink} onLinkGoogle={() => void linkGoogleAccount()} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
       </main>
 
       {view !== "hiscores" ? <aside className="status-column v3-status">
@@ -1246,7 +1271,7 @@ function HiscoresView({ signedIn, signInPath }: { signedIn: boolean; signInPath:
   </div>;
 }
 
-function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; onSaveName: (name: string) => void }) {
+function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, firebaseLink, onLinkGoogle, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; firebaseLink: { status: "idle" | "linking" | "linked" | "error"; message: string }; onLinkGoogle: () => void; onSaveName: (name: string) => void }) {
   const [name, setName] = useState(state.displayName || fallbackName);
   const savedName = state.displayName || fallbackName;
   const initials = savedName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "SC";
@@ -1274,6 +1299,11 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
     <section className="settings-panel account-settings panel">
       <div><p className="eyebrow">ACCOUNT</p><h2>{signedIn ? "ChatGPT account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in to carry this character and patrol progress between devices."}</p></div>
       {signedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+    </section>
+
+    <section className="settings-panel account-settings panel">
+      <div><p className="eyebrow">GOOGLE ACCOUNT</p><h2>Firebase sign-in</h2><p>{signedIn ? "Link Google while signed in to ChatGPT. It is attached to this exact commander save; XP, cargo and ranking history stay together." : "Sign in with ChatGPT first to link Google to your existing commander."}</p></div>
+      {signedIn ? <div className="firebase-link-action"><Button type="button" onClick={onLinkGoogle} disabled={firebaseLink.status === "linking" || firebaseLink.status === "linked"}>{firebaseLink.status === "linking" ? "Linking Google…" : firebaseLink.status === "linked" ? "Google linked" : "Link Google account"}</Button>{firebaseLink.message ? <small className={firebaseLink.status === "error" ? "firebase-link-error" : ""}>{firebaseLink.message}</small> : null}</div> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
     </section>
   </div>;
 }
