@@ -39,7 +39,7 @@ declare global {
 }
 
 type SaveStatus = "guest" | "saved" | "saving" | "error";
-type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "drones" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "missions";
+type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "missions";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
@@ -62,7 +62,7 @@ const itemIcons: Record<string, typeof Gem> = {
 const navigation: { group: string; items: { id: ViewId; label: string; icon: typeof Map }[] }[] = [
   { group: "Vessel", items: [
     { id: "ship", label: "Cruiser", icon: Rocket }, { id: "crew", label: "Crew", icon: Users },
-    { id: "drones", label: "Drones", icon: Bot }, { id: "combat", label: "Combat", icon: Crosshair },
+    { id: "combat", label: "Combat", icon: Crosshair },
   ] },
   { group: "Galaxy", items: [
     { id: "sectors", label: "Star Chart", icon: Map }, { id: "expeditions", label: "Expeditions", icon: Compass },
@@ -782,7 +782,6 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
     sectors: ["Star Chart", "Travel changes available resources, enemies and discoveries"],
     ship: ["Aethelgard Cruiser", "Four decks, nine upgradeable ship systems"],
     crew: ["Crew Roster", "Assign ten specialists to support the skills you value"],
-    drones: ["Drone Hangar", "Build autonomous craft for persistent skill bonuses"],
     combat: ["Combat Doctrine", "Balance weapons, protection and automatic retreat"],
     expeditions: ["Expeditions", "Prepare supplies and send teams on longer operations"],
     contracts: ["Faction Contracts", "Exchange production output for credits and reputation"],
@@ -839,9 +838,8 @@ export function GameShell({ initialState, signedIn, saveAvailable, accountName, 
         {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} onQueue={queueActivity} onClearQueue={() => updateState((current) => ({ ...current, productionQueue: [] }))} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
         {view === "sectors" ? <SectorView state={state} onTravel={travel} /> : null}
-        {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onPowerMode={setPowerMode} /> : null}
+        {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
         {view === "crew" ? <CrewView state={state} onAssign={assignCrew} /> : null}
-        {view === "drones" ? <DroneView state={state} onBuild={buildDrone} onBuildVehicle={buildVehicle} /> : null}
         {view === "combat" ? <CombatView state={state} onUpgrade={upgradeEquipment} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={() => startActivity(activityById["hull-repair"])} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onEquip={equipUniqueGear} onSaveLoadout={saveLoadout} onApplyLoadout={applyLoadout} onClearEffect={clearStatusEffect} /> : null}
         {view === "expeditions" ? <ExpeditionView state={state} now={now} onLaunch={launchExpedition} /> : null}
         {view === "contracts" ? <ContractView state={state} onComplete={completeContract} onAlly={formAlliance} /> : null}
@@ -908,14 +906,14 @@ function SectorView({ state, onTravel }: { state: GameState; onTravel: (id: stri
   })}</div>;
 }
 
-function ShipView({ state, onUpgrade, onPowerMode }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onPowerMode: (mode: PowerMode) => void }) {
+function ShipView({ state, onUpgrade, onPowerMode, onBuildDrone, onBuildVehicle }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
   const modes: { id: PowerMode; name: string; effect: string }[] = [
     { id: "balanced", name: "Balanced", effect: "No system penalties or priority bonuses" }, { id: "industrial", name: "Industrial", effect: "12% faster Engineering, Metallurgy and Drones" },
     { id: "research", name: "Research", effect: "12% faster scientific and medical skills" }, { id: "combat", name: "Combat", effect: "12% faster vessel encounters" },
     { id: "navigation", name: "Navigation", effect: "12% faster Astrogation, Logistics and Diplomacy" },
   ];
   const activeMode = modes.find((mode) => mode.id === state.powerMode) ?? modes[0];
-  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div></>;
+  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>Deck modules</h2></div><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} /></>;
 }
 
 function CrewView({ state, onAssign }: { state: GameState; onAssign: (id: string, skill: SkillId) => void }) {
