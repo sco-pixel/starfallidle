@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 31458)
-Total output lines: 1383
-
 "use client";
 /* eslint-disable @next/next/no-html-link-for-pages */
 
@@ -869,7 +866,73 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     };
   });
 
-  const viewTitle: Recor…1458 tokens truncated…iv className="operation-body">
+  const viewTitle: Record<ViewId, [string, string]> = {
+    skills: [skillMeta[selectedSkill].name, skillMeta[selectedSkill].description],
+    bank: ["Cargo Bank", "Every material carried aboard the Aethelgard"],
+    sectors: ["Star Chart", "Travel changes available resources, enemies and discoveries"],
+    ship: ["Aethelgard Cruiser", "Four decks, nine upgradeable ship systems"],
+    crew: ["Crew Roster", "Assign ten specialists to support the skills you value"],
+    combat: ["Combat Doctrine", "Balance weapons, protection and automatic retreat"],
+    expeditions: ["Expeditions", "Prepare supplies and send teams on longer operations"],
+    directives: ["Directive Board", "Active contracts, sector objectives and long-form missions in one place"],
+    research: ["Research Network", "Turn discoveries into permanent technical advantages"],
+    collection: ["Discovery Archive", "Record resources, enemies, ruins and expeditions"],
+    market: ["Station Market", "Prices shift every five minutes and vary by sector"],
+    patrol: ["Patrol Record", "Achievements, mastery and five-year commission cycles"],
+    character: ["Character & Settings", "Manage your commander identity and account"],
+    outposts: ["Sector Outposts", "Develop support infrastructure across the five established sectors"],
+    hiscores: ["Commander Hiscores", "Compare verified cloud-save records across the Starfall fleet"],
+  };
+
+  return (
+    <>
+      <header className="site-header">
+        <a className="brand-lockup" href="/" aria-label="Return to the Starfall Idle home screen">
+          <span className="brand-mark" aria-hidden="true"><Orbit /></span>
+          <div><p className="eyebrow">SECTOR // {activeSector.name.toUpperCase()}</p><h1>Starfall Idle</h1></div>
+        </a>
+        <div className="account-area">
+          <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
+          {signedIn
+            ? <><span className={`header-save-indicator ${saveStatus}`} role="status" aria-label={saveLabel} title={saveLabel}>{saveStatus === "saved" ? <ShieldCheck /> : <Cloud />}</span><button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button></>
+            : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+        </div>
+      </header>
+      <AlertDialog open={Boolean(guestImport)}>
+        <AlertDialogContent className="guest-import-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Guest patrol found on this device</AlertDialogTitle>
+            <AlertDialogDescription>Choose which character should be attached to your signed-in Starfall account. This choice is shown once on this device and does not combine inventories or XP.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {guestImport ? <div className="guest-import-comparison">
+            <section><p className="eyebrow">DEVICE GUEST</p><strong>{guestImport.displayName || "Guest commander"}</strong><span>Total level {totalLevel(guestImport)}</span><span>Patrol {guestImport.patrol} · {fmt(guestImport.totalActions)} operations</span></section>
+            <section><p className="eyebrow">CLOUD CHARACTER</p><strong>{initialState.displayName || accountName}</strong><span>Total level {totalLevel(initialState)}</span><span>{hasCloudSave ? `Patrol ${initialState.patrol} · ${fmt(initialState.totalActions)} operations` : "No existing cloud save"}</span></section>
+          </div> : null}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => resolveGuestImport(false)}>{hasCloudSave ? "Keep cloud character" : "Start new cloud character"}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => resolveGuestImport(true)}>Use guest progress</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    <div className={`game-layout v3 with-skill-nav ${view === "hiscores" ? "hiscores-mode" : ""}`}>
+      <aside className="command-nav panel">
+        <button className={`home-button ${view === "skills" ? "selected" : ""}`} onClick={() => setView("skills")}><Activity /><span><strong>Skill Matrix</strong><small>TL {totalLevel(state)}</small></span></button>
+        <div className="skill-list expanded-skills">
+          {SKILL_IDS.map((id) => {
+            const Icon = skillIcons[id];
+            const isCombat = id === "combat";
+            return <button key={id} className={`skill-button ${isCombat ? (view === "combat" ? "selected" : "") : (view === "skills" && selectedSkill === id ? "selected" : "")}`} onClick={() => isCombat ? openView("combat") : (setSelectedSkill(id), setView("skills"))}><span className="skill-icon"><Icon /></span><span><strong>{skillMeta[id].name}</strong><small>{isCombat ? "Combat console" : skillMeta[id].group}</small></span><b>{state.skills[id].level}</b>{active.skillId === id ? <i className="active-pip" /> : null}</button>;
+          })}
+        </div>
+        <button className="home-button bank-link" onClick={() => openView("bank")}><Boxes /><span><strong>Cargo Bank</strong><small>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} items</small></span></button>
+      </aside>
+
+      <main className="play-column">
+        {offlineReport ? <div className="offline-report panel"><Cloud /><div><strong>Offline patrol report · {duration(offlineReport.seconds)}</strong><span>{offlineReport.activity} · {offlineReport.actions} actions · +{offlineReport.xp} XP · {itemsText(offlineReport.gains)}</span></div><button onClick={() => setOfflineReport(null)}>×</button></div> : null}
+        {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
+        <section className="active-operation panel">
+          <div className="operation-mark"><CircleGauge /></div>
+          <div className="operation-body">
             <div className="operation-heading"><div><p className="eyebrow">ACTIVE · {skillMeta[active.skillId].name.toUpperCase()} · {activeSector.name.toUpperCase()}</p><h2>{active.name}</h2></div><span className="level-chip">LV {activeSkill.level}</span></div>
             <Progress value={activeBlocked ? 0 : state.progress} className="operation-progress" />
             <div className="operation-meta"><span>{activeBlocked ? `Paused — ${activePauseReasons.join(" · ")}` : `${Math.floor(state.progress)}% · ${actionSeconds(state, active).toFixed(1)}s action`}</span><span>{active.xp} XP · {itemsText(active.produces)}</span></div>
@@ -955,7 +1018,7 @@ function ShipView({ state, onUpgrade, onPowerMode, onBuildDrone, onBuildVehicle 
     { id: "navigation", name: "Navigation", effect: "12% faster Astrogation, Logistics and Diplomacy" },
   ];
   const activeMode = modes.find((mode) => mode.id === state.powerMode) ?? modes[0];
-  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>Deck modules</h2></div><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} /></>;
+  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>Deck modules</h2></div><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{module.effect(level)}</small><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} /></>;
 }
 
 function crewLevel(xp: number) {

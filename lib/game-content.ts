@@ -161,16 +161,16 @@ export const sectors = [
   { id: "silent", name: "The Silent Systems", level: 70, fuel: 5, tone: "Machine domain", description: "Endgame ruins protected by ancient autonomous sentinels." },
 ];
 
-export const shipModules: Record<ShipModuleId, { name: string; description: string }> = {
-  bridge: { name: "Bridge", description: "Astrogation speed and route access" },
-  cic: { name: "Combat Information Centre", description: "Combat and drone coordination" },
-  cargo: { name: "Cargo Bay", description: "Bank capacity and contract rewards" },
-  hydroponics: { name: "Hydroponics", description: "Xenobotany and ration output" },
-  fabricator: { name: "Fabrication Deck", description: "Engineering and metallurgy output" },
-  lab: { name: "Science Laboratory", description: "Science and archaeology research" },
-  medbay: { name: "Medical Bay", description: "Hull retreat recovery and morale" },
-  reactor: { name: "Reactor", description: "Shield strength and expedition range" },
-  hangar: { name: "Hangar", description: "Drone capacity and vehicle operations" },
+export const shipModules: Record<ShipModuleId, { name: string; description: string; effect: (level: number) => string }> = {
+  bridge: { name: "Bridge", description: "Deck 1 command bridge with helm, tactical and patrol-control stations.", effect: () => "Command station — no separate numeric bonus." },
+  cic: { name: "Combat Information Centre", description: "Deck 1 tactical centre coordinating sensors, weapons and drone swarms.", effect: (level) => `+${level} combat accuracy and -${level} incoming combat damage.` },
+  cargo: { name: "Cargo Bay", description: "Deck 3 modular 200-ton hold with magnetic restraints, lift and vehicle access.", effect: (level) => `+${level * 2}% station sale value.` },
+  hydroponics: { name: "Hydroponics", description: "Deck 2 life-support gardens supplying fresh food, herbs and atmosphere support.", effect: () => "Life-support facility — no separate numeric bonus." },
+  fabricator: { name: "Fabrication Deck", description: "Deck 4 machine shop for component manufacture, field repairs and refits.", effect: () => "Engineering facility — no separate numeric bonus." },
+  lab: { name: "Science Laboratory", description: "Deck 3 analysis lab for samples, anomalies, archaeology and research work.", effect: () => "Research facility — no separate numeric bonus." },
+  medbay: { name: "Medical Bay", description: "Deck 3 auto-doc, trauma bay and isolation space for the ten-person crew.", effect: () => "Medical facility — no separate numeric bonus." },
+  reactor: { name: "Antimatter Reactor", description: "Deck 4 power plant feeding propulsion, shields and every ship system.", effect: (level) => `Upgrade adds 10 maximum hull; current hull capacity is ${100 + Math.max(0, level - 1) * 10}.` },
+  hangar: { name: "Vehicle & Drone Bay", description: "Deck 3 storage and launch support for two rovers and the ship's drone swarms.", effect: () => "Operations bay — no separate numeric bonus." },
 };
 
 export const crew = [
