@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import Link from "next/link";
 import {
-  Activity, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
+  Activity, ArrowDownRight, ArrowUpRight, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
   Hammer, HeartPulse, History, Landmark, LockKeyhole, Map, Medal, Orbit,
   Menu, PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Search, Shield,
@@ -32,7 +32,6 @@ import {
   MAX_SKILL_LEVEL, SKILL_IDS, defaultGameState, levelFromXp, sanitizeGameState, xpForLevel,
   type CombatStance, type CombatWeapon, type DroneId, type EquipmentId, type GameState, type OutpostType, type PowerMode, type ResearchPath, type ShipModuleId, type SkillId, type StatusEffect, type VehicleId,
 } from "@/lib/game-state";
-import { firebaseAuth, firebaseGoogleProvider } from "@/lib/firebase-client";
 
 declare global {
   interface Document {
@@ -43,7 +42,6 @@ declare global {
 type SaveStatus = "guest" | "saved" | "saving" | "error";
 type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "contracts" | "objectives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "missions" | "hiscores";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
-type FirebaseSession = { userId: string; email: string | null; displayName: string | null; state: GameState; hasCloudSave: boolean };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
 const sectorById = Object.fromEntries(sectors.map((entry) => [entry.id, entry]));
@@ -127,8 +125,11 @@ const objectives: Objective[] = [
   { id: "space-superiority", sector: "Patrol", name: "Space Superiority", description: "Win 25 hostile encounters", reward: "8 Tactical Missiles", met: (s) => Object.values(s.combat.victories).reduce((a, b) => a + b, 0) >= 25, item: "missiles", amount: 8 },
 ];
 
-const marketGoods = ["ferrite", "salvage", "algae", "circuits", "medicine", "fuelRod"];
-const marketBase: Record<string, number> = { ferrite: 4, salvage: 6, algae: 5, circuits: 18, medicine: 22, fuelRod: 45 };
+const marketGoods = ["ferrite", "cobalt", "salvage", "algae", "rations", "circuits", "plating", "powerCell", "data", "medicine", "fuelRod"];
+const marketBase: Record<string, number> = {
+  ferrite: 4, cobalt: 9, salvage: 6, algae: 5, rations: 8, circuits: 18,
+  plating: 24, powerCell: 30, data: 14, medicine: 22, fuelRod: 45,
+};
 
 function fmt(value: number) { return Math.floor(value).toLocaleString(); }
 function duration(seconds: number) {
@@ -467,117 +468,33 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [offlineReport, setOfflineReport] = useState<OfflineReport | null>(null);
   const [guestImport, setGuestImport] = useState<GameState | null>(null);
-  const [firebaseLink, setFirebaseLink] = useState<{ status: "idle" | "linking" | "linked" | "error"; message: string }>({ status: "idle", message: "" });
-  const [firebaseSession, setFirebaseSession] = useState<FirebaseSession | null>(null);
-  const [firebaseAuthStatus, setFirebaseAuthStatus] = useState<"idle" | "connecting" | "loading" | "unlinked" | "error">("idle");
   const [now, setNow] = useState(initialState.lastActiveAt);
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSave = useRef(false);
-  const cloudSaveEnabled = useRef(!signedIn);
-  const firebaseCloudActive = !signedIn && Boolean(firebaseSession);
-  const cloudSignedIn = signedIn || firebaseCloudActive;
-  const cloudSaveAvailable = signedIn ? saveAvailable : firebaseCloudActive;
-  const activeAccountId = signedIn ? accountId : firebaseSession?.userId ?? null;
-  const activeAccountName = signedIn ? accountName : firebaseSession?.displayName ?? firebaseSession?.email ?? "Google commander";
-  const activeAccountEmail = signedIn ? accountEmail : firebaseSession?.email ?? null;
+  const cloudSaveEnabled = useRef(false);
+  const cloudSignedIn = signedIn;
+  const cloudSaveAvailable = saveAvailable;
+  const activeAccountId = accountId;
+  const activeAccountName = accountName;
+  const activeAccountEmail = accountEmail;
   useEffect(() => { stateRef.current = state; }, [state]);
-
-  const linkGoogleAccount = useCallback(async () => {
-    if (!signedIn) return;
-    setFirebaseLink({ status: "linking", message: "Opening Google sign-in…" });
-    try {
-      const result = await signInWithPopup(firebaseAuth, firebaseGoogleProvider);
-      const token = await result.user.getIdToken();
-      const response = await fetch("/api/firebase/link", {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}` },
-      });
-      const body = await response.json() as { error?: string; email?: string };
-      if (!response.ok) throw new Error(body.error ?? "Unable to link Google.");
-      setFirebaseLink({
-        status: "linked",
-        message: `${body.email ?? result.user.email ?? "Google account"} linked to this commander.`,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Google linking was cancelled or unavailable.";
-      setFirebaseLink({ status: "error", message });
-    }
-  }, [signedIn]);
-
-  const signInWithGoogle = useCallback(async () => {
-    setFirebaseAuthStatus("connecting");
-    try {
-      await signInWithPopup(firebaseAuth, firebaseGoogleProvider);
-    } catch {
-      setFirebaseAuthStatus("error");
-    }
-  }, []);
-
-  const signOutGoogle = useCallback(async () => {
-    await signOut(firebaseAuth);
-    setFirebaseSession(null);
-    setFirebaseAuthStatus("idle");
-    window.location.reload();
-  }, []);
-
-  useEffect(() => {
-    if (signedIn) return;
-    return onAuthStateChanged(firebaseAuth, (user) => {
-      if (!user) {
-        setFirebaseSession(null);
-        return;
-      }
-      setFirebaseAuthStatus("loading");
-      void (async () => {
-        try {
-          const token = await user.getIdToken();
-          const response = await fetch("/api/firebase/save", { headers: { authorization: "Bearer " + token } });
-          const payload = await response.json() as {
-            error?: string;
-            exists?: boolean;
-            state?: GameState;
-            account?: { userId: string; email: string | null; displayName: string | null };
-          };
-          if (!response.ok || !payload.account || !payload.state) {
-            setFirebaseSession(null);
-            setFirebaseAuthStatus("unlinked");
-            return;
-          }
-          cloudSaveEnabled.current = false;
-          setFirebaseSession({
-            userId: payload.account.userId,
-            email: payload.account.email ?? user.email,
-            displayName: payload.account.displayName ?? user.displayName,
-            state: sanitizeGameState(payload.state),
-            hasCloudSave: Boolean(payload.exists),
-          });
-          setFirebaseAuthStatus("idle");
-        } catch {
-          setFirebaseAuthStatus("error");
-        }
-      })();
-    });
-  }, [signedIn]);
 
   const persist = useCallback(async (next: GameState) => {
     if (!cloudSignedIn || !cloudSaveAvailable || !cloudSaveEnabled.current) return;
     setSaveStatus("saving");
     try {
-      const firebaseUser = signedIn ? null : firebaseAuth.currentUser;
-      const firebaseToken = firebaseUser ? await firebaseUser.getIdToken() : null;
-      if (!signedIn && !firebaseToken) throw new Error("Google session unavailable");
-      const response = await fetch(signedIn ? "/api/save" : "/api/firebase/save", {
+      const response = await fetch("/api/save", {
         method: "POST",
-        headers: { "content-type": "application/json", ...(firebaseToken ? { authorization: "Bearer " + firebaseToken } : {}) },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...next, lastActiveAt: Date.now() }), keepalive: true,
       });
       if (!response.ok) throw new Error("Save failed");
       pendingSave.current = false;
       setSaveStatus("saved");
     } catch { setSaveStatus("error"); }
-  }, [cloudSaveAvailable, cloudSignedIn, signedIn]);
+  }, [cloudSaveAvailable, cloudSignedIn]);
 
   const queueSave = useCallback((next: GameState) => {
     if (!cloudSignedIn || !cloudSaveAvailable) return;
@@ -597,7 +514,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
 
   /* eslint-disable react-hooks/set-state-in-effect -- hydration imports browser-only guest state into the live game. */
   useEffect(() => {
-    let base = signedIn ? initialState : firebaseSession?.state ?? initialState;
+    let base = initialState;
     if (!cloudSignedIn) {
       try {
         const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v5") ?? localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
@@ -624,7 +541,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     setOfflineReport(result.report);
     setHydrated(true);
     if (result.report) queueSave(result.state);
-  }, [activeAccountId, cloudSignedIn, firebaseSession, initialState, queueSave, signedIn]);
+  }, [activeAccountId, cloudSignedIn, initialState, queueSave]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const resolveGuestImport = (useGuest: boolean) => {
@@ -867,17 +784,25 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     return { ...current, inventory: spend(current.inventory, expedition.cost), activeExpedition: { id, endsAt: Date.now() + expedition.minutes * 60_000 }, crewMorale: Math.max(0, current.crewMorale - 2), lastActiveAt: Date.now() };
   });
 
-  const marketPrice = (item: string) => {
+  const marketPrice = (item: string, mode: "buy" | "sell" = "buy") => {
     const sectorFactor = 1 + sectors.findIndex((entry) => entry.id === state.sectorId) * 0.08;
     const marketWave = 0.9 + ((Math.floor(now / 300_000) + item.length) % 5) * 0.05;
-    return Math.max(1, Math.round(marketBase[item] * sectorFactor * marketWave));
+    const stationPrice = marketBase[item] * sectorFactor * marketWave;
+    if (mode === "sell") {
+      const cargoBonus = 1 + state.shipModules.cargo * 0.02 + state.skills.logistics.level * 0.003;
+      return Math.max(1, Math.floor(stationPrice * 0.7 * cargoBonus));
+    }
+    return Math.max(1, Math.ceil(stationPrice * 1.1));
   };
-  const trade = (item: string, mode: "buy" | "sell") => updateState((current) => {
-    const price = marketPrice(item);
-    if (mode === "buy" && current.credits >= price) return { ...current, credits: current.credits - price, inventory: addItems(current.inventory, { [item]: 1 }), lastActiveAt: Date.now() };
-    if (mode === "sell" && (current.inventory[item] ?? 0) > 0) {
-      const cargoBonus = 1 + current.shipModules.cargo * 0.02 + current.skills.logistics.level * 0.003;
-      return { ...current, credits: current.credits + Math.max(1, Math.floor(price * 0.7 * cargoBonus)), inventory: spend(current.inventory, { [item]: 1 }), lastActiveAt: Date.now() };
+  const trade = (item: string, mode: "buy" | "sell", requestedAmount: number) => updateState((current) => {
+    const price = marketPrice(item, mode);
+    const amount = mode === "buy"
+      ? Math.min(Math.max(0, Math.floor(requestedAmount)), Math.floor(current.credits / price))
+      : Math.min(Math.max(0, Math.floor(requestedAmount)), current.inventory[item] ?? 0);
+    if (!amount) return current;
+    if (mode === "buy") return { ...current, credits: current.credits - price * amount, inventory: addItems(current.inventory, { [item]: amount }), lastActiveAt: Date.now() };
+    if (mode === "sell") {
+      return { ...current, credits: current.credits + price * amount, inventory: spend(current.inventory, { [item]: amount }), lastActiveAt: Date.now() };
     }
     return current;
   });
@@ -942,15 +867,15 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   return (
     <>
       <header className="site-header">
-        <button className="brand-lockup" type="button" onClick={() => { setSelectedSkill(state.activeTask.skillId); openView("skills"); }} aria-label="Return to the Starfall Idle home screen">
+        <Link className="brand-lockup" href="/" aria-label="Return to the Starfall Idle home screen">
           <span className="brand-mark" aria-hidden="true"><Orbit /></span>
           <div><p className="eyebrow">SECTOR // {activeSector.name.toUpperCase()}</p><h1>Starfall Idle</h1></div>
-        </button>
+        </Link>
         <div className="account-area">
           <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
-          {cloudSignedIn
+          {signedIn
             ? <><span className={`header-save-indicator ${saveStatus}`} role="status" aria-label={saveLabel} title={saveLabel}>{saveStatus === "saved" ? <ShieldCheck /> : <Cloud />}</span><button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button></>
-            : <div className="firebase-primary-login"><button className="sign-in-link" type="button" onClick={() => void signInWithGoogle()} disabled={firebaseAuthStatus === "connecting" || firebaseAuthStatus === "loading"}>{firebaseAuthStatus === "connecting" || firebaseAuthStatus === "loading" ? "Connecting Google…" : "Sign in with Google"}</button><a className="legacy-sign-in-link" href={signInPath} target="_top">Migrate ChatGPT save</a>{firebaseAuthStatus === "unlinked" ? <small>Google is not linked to a commander yet.</small> : firebaseAuthStatus === "error" ? <small>Google sign-in is unavailable. Please try again.</small> : null}</div>}
+            : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
         </div>
       </header>
       <AlertDialog open={Boolean(guestImport)}>
@@ -1006,12 +931,12 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
         {view === "objectives" ? <ObjectiveView state={state} onClaim={claimObjective} /> : null}
         {view === "research" ? <ResearchView state={state} onUnlock={unlockResearch} onChoosePath={chooseResearchPath} /> : null}
         {view === "collection" ? <CollectionView state={state} /> : null}
-        {view === "market" ? <MarketView state={state} getPrice={marketPrice} onTrade={trade} /> : null}
+        {view === "market" ? <MarketView state={state} now={now} getPrice={marketPrice} onTrade={trade} /> : null}
         {view === "patrol" ? <PatrolView state={state} onNewPatrol={beginNewPatrol} /> : null}
         {view === "outposts" ? <OutpostView state={state} onDevelop={developOutpost} /> : null}
         {view === "missions" ? <MissionView state={state} onClaim={claimMission} /> : null}
         {view === "hiscores" ? <HiscoresView signedIn={signedIn} signInPath={signInPath} /> : null}
-        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} email={activeAccountEmail} signedIn={cloudSignedIn} legacySignedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} firebaseLink={firebaseLink} onLinkGoogle={() => void linkGoogleAccount()} onSignInGoogle={() => void signInWithGoogle()} onSignOutGoogle={() => void signOutGoogle()} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
+        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} email={activeAccountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
       </main>
 
       {view !== "hiscores" ? <aside className="status-column v3-status">
@@ -1191,8 +1116,29 @@ function CollectionView({ state }: { state: GameState }) {
   return <div className="collection-groups">{groups.map((group) => <section key={group}><div className="collection-title"><h2>{group}</h2><span>{collectionEntries.filter((entry) => entry[2] === group && state.collection.includes(entry[0])).length} / {collectionEntries.filter((entry) => entry[2] === group).length}</span></div><div className="collection-grid">{collectionEntries.filter((entry) => entry[2] === group).map(([id, name]) => { const found = state.collection.includes(id); return <div key={id} className={`collection-item panel ${found ? "found" : ""}`}>{found ? <Sparkles /> : <LockKeyhole />}<span>{found ? name : "Unknown discovery"}</span></div>; })}</div></section>)}<section><div className="collection-title"><h2>Rare operation discoveries</h2><span>{rareDiscoveries.length} found</span></div><div className="collection-grid">{rareDiscoveries.length ? rareDiscoveries.map((name) => <div key={name} className="collection-item panel found"><Sparkles /><span>{name} anomaly</span></div>) : <div className="collection-item panel"><LockKeyhole /><span>Complete 250 of an operation</span></div>}</div></section></div>;
 }
 
-function MarketView({ state, getPrice, onTrade }: { state: GameState; getPrice: (id: string) => number; onTrade: (id: string, mode: "buy" | "sell") => void }) {
-  return <div className="market-table panel">{marketGoods.map((id) => { const Icon = itemIcons[id]; const price = getPrice(id); return <div key={id} className="market-row"><span><Icon /></span><div><strong>{itemNames[id]}</strong><small>In cargo: {state.inventory[id]}</small></div><b>{price} cr</b><Button variant="outline" disabled={!state.inventory[id]} onClick={() => onTrade(id, "sell")}>Sell</Button><Button disabled={state.credits < price} onClick={() => onTrade(id, "buy")}>Buy</Button></div>; })}</div>;
+function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: number; getPrice: (id: string, mode?: "buy" | "sell") => number; onTrade: (id: string, mode: "buy" | "sell", amount: number) => void }) {
+  const [orderSize, setOrderSize] = useState(1);
+  const sector = sectorById[state.sectorId];
+  const nextRefresh = 300 - Math.floor((now % 300_000) / 1_000);
+  const cargoBonus = Math.round((state.shipModules.cargo * 2 + state.skills.logistics.level * 0.3) * 10) / 10;
+  return <div className="market-view">
+    <section className="market-overview panel">
+      <div><p className="eyebrow">DOCKED AT {sector.name.toUpperCase()}</p><h2>Station exchange</h2><p>Trade common supplies at the local station. Quotes refresh every five minutes; selling benefits from your cargo deck and Logistics training.</p></div>
+      <div className="market-metrics"><span><Coins />{fmt(state.credits)}<small>credits</small></span><span><PackageOpen />{fmt(Object.values(state.inventory).reduce((total, amount) => total + amount, 0))}<small>cargo units</small></span><span><Activity />{Math.floor(nextRefresh / 60)}:{String(nextRefresh % 60).padStart(2, "0")}<small>next refresh</small></span></div>
+    </section>
+    <section className="market-toolbar panel"><div><strong>Order size</strong><div className="market-size-buttons">{[1, 5, 10, 25].map((amount) => <Button key={amount} variant={orderSize === amount ? "default" : "outline"} onClick={() => setOrderSize(amount)}>{amount}</Button>)}</div></div><p><TrendingUp />Cargo and Logistics add <b>+{cargoBonus}%</b> to sell quotes.</p></section>
+    <section className="market-table panel"><div className="market-table-head"><span>Commodity</span><span>Market quote</span><span>Trade</span></div>{marketGoods.map((id) => {
+      const Icon = itemIcons[id];
+      const buyPrice = getPrice(id, "buy");
+      const sellPrice = getPrice(id, "sell");
+      const holding = state.inventory[id] ?? 0;
+      const base = marketBase[id] * (1 + sectors.findIndex((entry) => entry.id === state.sectorId) * 0.08);
+      const rising = buyPrice >= base * 1.1;
+      const buyAmount = Math.min(orderSize, Math.floor(state.credits / buyPrice));
+      const sellAmount = Math.min(orderSize, holding);
+      return <div key={id} className="market-row"><span className="market-item-icon"><Icon /></span><div className="market-item"><strong>{itemNames[id]}</strong><small>In cargo: {fmt(holding)}</small></div><div className="market-quote"><span className={rising ? "rising" : "falling"}>{rising ? <ArrowUpRight /> : <ArrowDownRight />}{rising ? "Active demand" : "Soft demand"}</span><b>Buy {buyPrice} cr</b><small>Sell {sellPrice} cr</small></div><div className="market-actions"><Button variant="outline" disabled={!sellAmount} onClick={() => onTrade(id, "sell", orderSize)}>Sell {sellAmount || orderSize}</Button><Button disabled={!buyAmount} onClick={() => onTrade(id, "buy", orderSize)}>Buy {buyAmount || orderSize}</Button></div></div>;
+    })}</section>
+  </div>;
 }
 
 function PatrolView({ state, onNewPatrol }: { state: GameState; onNewPatrol: () => void }) {
@@ -1340,7 +1286,7 @@ function HiscoresView({ signedIn, signInPath }: { signedIn: boolean; signInPath:
   </div>;
 }
 
-function CharacterView({ state, fallbackName, email, signedIn, legacySignedIn, signInPath, signOutPath, firebaseLink, onLinkGoogle, onSignInGoogle, onSignOutGoogle, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; legacySignedIn: boolean; signInPath: string; signOutPath: string; firebaseLink: { status: "idle" | "linking" | "linked" | "error"; message: string }; onLinkGoogle: () => void; onSignInGoogle: () => void; onSignOutGoogle: () => void; onSaveName: (name: string) => void }) {
+function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; onSaveName: (name: string) => void }) {
   const [name, setName] = useState(state.displayName || fallbackName);
   const savedName = state.displayName || fallbackName;
   const initials = savedName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "SC";
@@ -1352,7 +1298,7 @@ function CharacterView({ state, fallbackName, email, signedIn, legacySignedIn, s
   return <div className="character-settings">
     <section className="character-card panel">
       <div className="character-emblem">{initials}</div>
-      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{legacySignedIn ? "Legacy ChatGPT session · cloud save active" : signedIn ? "Google account · cloud save active" : "Guest profile · saved on this device"}</span></div>
+      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{signedIn ? "ChatGPT account · cloud save active" : "Guest profile · saved on this device"}</span></div>
       <div className="character-record"><span>Patrol <b>{state.patrol}</b></span><span>Total level <b>{totalLevel(state)}</b></span><span>Operations <b>{fmt(state.totalActions)}</b></span></div>
     </section>
 
@@ -1366,13 +1312,8 @@ function CharacterView({ state, fallbackName, email, signedIn, legacySignedIn, s
     </section>
 
     <section className="settings-panel account-settings panel">
-      <div><p className="eyebrow">ACCOUNT</p><h2>{legacySignedIn ? "ChatGPT migration session" : signedIn ? "Google account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in with Google to carry this character and patrol progress between devices."}</p></div>
-      {legacySignedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : signedIn ? <Button type="button" variant="outline" onClick={onSignOutGoogle}>Sign out</Button> : <Button type="button" onClick={onSignInGoogle}>Sign in with Google</Button>}
-    </section>
-
-    <section className="settings-panel account-settings panel">
-      <div><p className="eyebrow">GOOGLE ACCOUNT</p><h2>Firebase sign-in</h2><p>{legacySignedIn ? "Link Google while signed in to ChatGPT. It is attached to this exact commander save; XP, cargo and ranking history stay together." : signedIn ? "Google is your primary Starfall sign-in." : "Use this one-time migration path only if you have an existing ChatGPT save."}</p></div>
-      {legacySignedIn ? <div className="firebase-link-action"><Button type="button" onClick={onLinkGoogle} disabled={firebaseLink.status === "linking" || firebaseLink.status === "linked"}>{firebaseLink.status === "linking" ? "Linking Google…" : firebaseLink.status === "linked" ? "Google linked" : "Link Google account"}</Button>{firebaseLink.message ? <small className={firebaseLink.status === "error" ? "firebase-link-error" : ""}>{firebaseLink.message}</small> : null}</div> : signedIn ? <small>Linked Google account active.</small> : <a className="sign-in-link" href={signInPath} target="_top">Migrate ChatGPT save</a>}
+      <div><p className="eyebrow">ACCOUNT</p><h2>{signedIn ? "ChatGPT account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in with ChatGPT to carry this character and patrol progress between devices."}</p></div>
+      {signedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
     </section>
   </div>;
 }

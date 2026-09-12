@@ -1,0 +1,1 @@
+DROP TABLE `firebase_accounts`;
