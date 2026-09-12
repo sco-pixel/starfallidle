@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 31252)
-Total output lines: 1378
+Warning: truncated output (original token count: 31458)
+Total output lines: 1383
 
 "use client";
 /* eslint-disable @next/next/no-html-link-for-pages */
@@ -334,7 +334,8 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
   if (activity.skillId === "diplomacy") factions.frontier = Math.min(100, factions.frontier + count);
   const totalActionsAfter = state.totalActions + count;
   const crossedEvent = Math.floor(totalActionsAfter / 40) > Math.floor(state.totalActions / 40);
-  const nextEvent = crossedEvent && !state.pendingEvent ? (totalActionsAfter % 80 < 40 ? "escapePod" : "cargoNoise") : state.pendingEvent;
+  const eventIds = Object.keys(storyEvents);
+  const nextEvent = crossedEvent && !state.pendingEvent ? eventIds[Math.floor(totalActionsAfter / 40) % eventIds.length] : state.pendingEvent;
 
   let combat = state.combat;
   let statusEffects = [...state.statusEffects];
@@ -651,7 +652,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
 
   const startCombat = useCallback((activity: SkillActivity) => {
     const current = stateRef.current;
-    if (activity.skillId !== "combat" || current.skills.combat.level < activity.level || !activityAvailable(current, activity)) return;
+    if (activity.skillId !== "combat" || operationPauseReasons(current, activity).length) return;
     updateState((entry) => ({ ...entry, combat: { ...entry.combat, activeTaskId: activity.id, progress: 0 }, lastActiveAt: Date.now() }));
   }, [updateState]);
 
@@ -832,13 +833,15 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     const event = current.pendingEvent ? storyEvents[current.pendingEvent as keyof typeof storyEvents] : null;
     const choice = event?.choices.find((entry) => entry.id === choiceId);
     if (!event || !choice) return current;
-    const reward = "credits" in choice.reward ? {} : choice.reward;
-    const credits = "credits" in choice.reward ? choice.reward.credits ?? 0 : 0;
+    const { credits = 0, ...reward } = choice.reward;
+    const factions = choice.faction ? { ...current.factions, [choice.faction.id]: Math.min(100, (current.factions[choice.faction.id] ?? 0) + choice.faction.reputation) } : current.factions;
     return {
       ...current,
       credits: current.credits + credits,
       inventory: addItems(current.inventory, reward),
       crewMorale: Math.max(0, Math.min(100, current.crewMorale + choice.morale)),
+      commandPoints: current.commandPoints + (choice.commandPoints ?? 0),
+      factions,
       pendingEvent: null,
       storyLog: [choice.result, ...current.storyLog].slice(0, 30),
       lastActiveAt: Date.now(),
@@ -846,34 +849,27 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   });
 
   const beginNewPatrol = () => updateState((current) => {
-    if (totalLevel(current) < 700 || current.completedExpeditions < 6 || (current.combat.victories["boss-sentinel-foundry"] ?? 0) < 1) return current;
+    if (totalLevel(current) < 350 || current.completedExpeditions < 3 || (current.combat.victories["boss-corsair-carrier"] ?? 0) < 1) return current;
     const fresh = defaultGameState();
     const uniqueInventory = Object.fromEntries(Object.keys(uniqueGear).map((id) => [id, current.inventory[id] ?? 0]));
     return {
       ...fresh,
       patrol: current.patrol + 1,
-      commandPoints: current.commandPoints + 2 + Math.floor(current.missionsCompleted.length / 2),
+      commandPoints: current.commandPoints + 3 + Math.floor(current.missionsCompleted.length / 2),
       collection: current.collection,
       researchUnlocked: current.researchUnlocked,
       operationMastery: current.operationMastery,
       crewXp: current.crewXp,
       crewLoyalty: current.crewLoyalty,
-      inventory: { ...fresh.inventory, ...uniqueInventory },
+      credits: fresh.credits + 300 + current.patrol * 100,
+      inventory: { ...fresh.inventory, ...uniqueInventory, rations: 12, medicine: 6, fuelRod: 3, powerCell: 4 },
       equippedGear: current.equippedGear,
       achievements: Array.from(new Set([...current.achievements, "veteran"])),
       storyLog: [`Patrol ${String(current.patrol + 1).padStart(2, "0")} commissioned. Veteran crew, operation mastery and unique gear carried forward.`, ...current.storyLog].slice(0, 100),
     };
   });
 
-  const viewTitle: Record<ViewId, [string, string]> = {
-    skills: [skillMeta[selectedSkill].name, skillMeta[selectedSkill].description],
-    bank: ["Cargo Bank", "Every material carried aboard the Aethelgard"],
-    sectors: ["Star Chart", "Travel changes available resources, enemies and discoveries"],
-    ship: ["Aethelgard Cr…1252 tokens truncated…g>Offline patrol report · {duration(offlineReport.seconds)}</strong><span>{offlineReport.activity} · {offlineReport.actions} actions · +{offlineReport.xp} XP · {itemsText(offlineReport.gains)}</span></div><button onClick={() => setOfflineReport(null)}>×</button></div> : null}
-        {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
-        <section className="active-operation panel">
-          <div className="operation-mark"><CircleGauge /></div>
-          <div className="operation-body">
+  const viewTitle: Recor…1458 tokens truncated…iv className="operation-body">
             <div className="operation-heading"><div><p className="eyebrow">ACTIVE · {skillMeta[active.skillId].name.toUpperCase()} · {activeSector.name.toUpperCase()}</p><h2>{active.name}</h2></div><span className="level-chip">LV {activeSkill.level}</span></div>
             <Progress value={activeBlocked ? 0 : state.progress} className="operation-progress" />
             <div className="operation-meta"><span>{activeBlocked ? `Paused — ${activePauseReasons.join(" · ")}` : `${Math.floor(state.progress)}% · ${actionSeconds(state, active).toFixed(1)}s action`}</span><span>{active.xp} XP · {itemsText(active.produces)}</span></div>
@@ -1032,22 +1028,23 @@ function CombatView({ state, onUpgrade, onRetreat, onRepair, onDoctrine, onEngag
     </section>
     <section className="depth-panel panel"><div><p className="eyebrow">TACTICAL LOADOUTS</p><h2>Doctrine presets</h2><p>Store weapon, stance and retreat settings for quick changes between targets.</p></div><div className="loadout-grid">{(["alpha", "beta"] as const).map((slot) => { const loadout = state.combatLoadouts[slot]; return <article key={slot}><strong>{slot.toUpperCase()}</strong><span>{weaponNames[loadout.weapon]} · {stanceNames[loadout.stance]} · retreat {loadout.retreatAt}%</span><div><Button variant="outline" onClick={() => onSaveLoadout(slot)}>Save current</Button><Button onClick={() => onApplyLoadout(slot)}>Apply</Button></div></article>; })}</div></section>
     {state.statusEffects.length ? <section className="depth-panel panel"><div><p className="eyebrow">SHIP CONDITIONS</p><h2>Persistent battle damage</h2><p>Conditions remain after combat until treated here or cleared by their related skill.</p></div><div className="effect-grid">{state.statusEffects.map((effect) => <article key={effect}><strong>{effect.replace(/([A-Z])/g, " $1")}</strong><span>{effect === "radiation" ? "Operations 5% slower · clear with 2 Medkits or Medicine" : effect === "hullBreach" ? "Incoming damage +18% · clear with 5 Salvage or Engineering" : effect === "sensorDisruption" ? "Combat accuracy −8% · clear with 5 Data or Science" : "Operations 10% slower · clear with 2 Power Cells or Metallurgy"}</span><Button variant="outline" onClick={() => onClearEffect(effect)}>Treat</Button></article>)}</div></section> : null}
-    <div className="section-label"><p className="eyebrow">HOSTILE CONTACTS</p><h2>Target roster</h2></div>
-    <div className="combat-targets">{targets.map((target) => {
+    <div className="section-label combat-roster-heading"><p className="eyebrow">HOSTILE CONTACTS</p><h2>Target roster</h2><span>Target cards always show the next actionable requirement.</span></div>
+    <div className="combat-targets">{[...targets].sort((a, b) => a.level - b.level).map((target) => {
       const enemy = target.enemy!;
-      const available = state.skills.combat.level >= target.level && activityAvailable(state, target);
-      const hasAmmo = state.combat.weapon !== "missile" || (state.inventory.missiles ?? 0) > 0;
+      const unavailableReasons = operationPauseReasons(state, target);
+      const available = unavailableReasons.length === 0;
       const matchup = combatMatchup(state, target);
       const active = state.combat.activeTaskId === target.id;
       const victories = state.combat.victories[target.id] ?? 0;
       const rareIn = enemy.rareEvery - victories % enemy.rareEvery;
-      return <article key={target.id} className={`combat-target panel ${active ? "active" : ""}`}>
+      return <article key={target.id} className={`combat-target panel ${active ? "active" : ""} ${available ? "available" : "unavailable"}`}>
         <div className="target-head"><span><Crosshair /></span><div><p className="eyebrow">{enemy.class.toUpperCase()} · LEVEL {target.level}</p><h3>{target.name}</h3></div><b>{victories} KILLS</b></div>
         <p>{target.description}</p>
         <div className="target-stats"><span>Hull <b>{enemy.hull}</b></span><span>Shield <b>{enemy.shields}</b></span><span>Armor <b>{enemy.armor}</b></span><span>Evasion <b>{enemy.evasion}</b></span></div>
         <div className="matchup-readout"><span className={matchup.weakness ? "advantage" : ""}>{matchup.weakness ? "WEAKNESS EXPLOITED" : `Weak to ${weaponNames[enemy.weakness]}`}</span><span>{matchup.hitChance}% hit · {actionSeconds(state, target).toFixed(1)}s · {combatDamage(state, target)} incoming</span></div>
         <small>Standard: {itemsText(target.produces)} · Rare in {rareIn}: {itemsText(enemy.rareDrop)}</small>
-        <Button disabled={!available || !hasAmmo || active} onClick={() => onEngage(target)}>{active ? "Engaging" : !available ? "Target unavailable" : !hasAmmo ? "No missiles" : "Engage target"}</Button>
+        {!available ? <em className="combat-unavailable">{unavailableReasons[0]}</em> : <em className="combat-ready">Ready to engage</em>}
+        <Button disabled={!available || active} onClick={() => onEngage(target)}>{active ? "Engaging" : available ? "Engage target" : "Requirements unmet"}</Button>
       </article>;
     })}</div>
     <div className="combat-milestones panel"><div><p className="eyebrow">COMBAT SPECIALISATION</p><h2>Rank perks</h2></div>{milestones.map(([level, name, effect]) => <div key={level} className={state.skills.combat.level >= level ? "unlocked" : ""}><span>LV {level}</span><strong>{name}</strong><small>{effect}</small></div>)}</div>
@@ -1136,8 +1133,8 @@ function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: 
 }
 
 function PatrolView({ state, onNewPatrol }: { state: GameState; onNewPatrol: () => void }) {
-  const ready = totalLevel(state) >= 700 && state.completedExpeditions >= 6 && (state.combat.victories["boss-sentinel-foundry"] ?? 0) >= 1;
-  return <><div className="patrol-hero panel"><Medal /><div><p className="eyebrow">COMMISSION {String(state.patrol).padStart(2, "0")}</p><h2>{state.commandPoints} Command Points</h2><p>New commissions award 2 Command Points plus mission bonuses. Mastered operations, veteran crew, research, discoveries and unique boss gear carry forward.</p></div><AlertDialog><AlertDialogTrigger asChild><Button disabled={!ready}>Begin new patrol</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>End the current patrol?</AlertDialogTitle><AlertDialogDescription>This resets skill XP, ordinary cargo, ship modules, outposts and standard equipment. Research, discoveries, operation mastery, crew progression, unique gear and Command Points are retained.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep patrolling</AlertDialogCancel><AlertDialogAction onClick={onNewPatrol}>Begin new commission</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div><div className="record-grid"><section className="panel"><h2>Achievements</h2>{achievements.map((entry) => <div key={entry.id} className={state.achievements.includes(entry.id) ? "earned" : ""}>{state.achievements.includes(entry.id) ? <Trophy /> : <LockKeyhole />}<span>{entry.name}</span></div>)}</section><section className="panel"><h2>Patrol requirements</h2><div className={totalLevel(state) >= 700 ? "earned" : ""}><Check /><span>Total level 700 ({totalLevel(state)} / 700)</span></div><div className={state.completedExpeditions >= 6 ? "earned" : ""}><Check /><span>Complete 6 expeditions ({state.completedExpeditions} / 6)</span></div><div className={(state.combat.victories["boss-sentinel-foundry"] ?? 0) >= 1 ? "earned" : ""}><Check /><span>Defeat the Sentinel Foundry</span></div><div><History /><span>{state.totalActions.toLocaleString()} lifetime actions this patrol</span></div></section><section className="panel log-record"><h2>Captain&apos;s log</h2>{state.storyLog.slice(0, 30).map((entry, index) => <p key={index}>{entry}</p>)}</section></div></>;
+  const ready = totalLevel(state) >= 350 && state.completedExpeditions >= 3 && (state.combat.victories["boss-corsair-carrier"] ?? 0) >= 1;
+  return <><div className="patrol-hero panel"><Medal /><div><p className="eyebrow">COMMISSION {String(state.patrol).padStart(2, "0")}</p><h2>{state.commandPoints} Command Points</h2><p>New commissions retain veteran progress and start the next patrol with a command cache. The first reset is now intended as a mid-game milestone, not an endgame wall.</p></div><AlertDialog><AlertDialogTrigger asChild><Button disabled={!ready}>Begin new patrol</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>End the current patrol?</AlertDialogTitle><AlertDialogDescription>You keep research, discoveries, operation mastery, crew progression, unique boss gear and Command Points. The next commission starts with 300 credits plus 100 per completed patrol, rations, medkits, fuel rods, power cells, and 3 new Command Points.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep patrolling</AlertDialogCancel><AlertDialogAction onClick={onNewPatrol}>Begin new commission</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div><div className="record-grid"><section className="panel"><h2>Reset perks</h2><div className="earned"><Sparkles /><span>+3 Command Points, plus mission bonus points</span></div><div className="earned"><Coins /><span>Commission cache: credits, 12 rations, 6 medkits, 3 fuel rods and 4 power cells</span></div><div className="earned"><Cloud /><span>Each patrol extends the offline cap by 2 hours</span></div><div className="earned"><Users /><span>Veteran crew, research, mastery, discoveries and unique gear remain</span></div></section><section className="panel"><h2>Patrol requirements</h2><div className={totalLevel(state) >= 350 ? "earned" : ""}><Check /><span>Total level 350 ({totalLevel(state)} / 350)</span></div><div className={state.completedExpeditions >= 3 ? "earned" : ""}><Check /><span>Complete 3 expeditions ({state.completedExpeditions} / 3)</span></div><div className={(state.combat.victories["boss-corsair-carrier"] ?? 0) >= 1 ? "earned" : ""}><Check /><span>Defeat the Corsair Carrier</span></div><div><History /><span>{state.totalActions.toLocaleString()} lifetime actions this patrol</span></div></section><section className="panel log-record"><h2>Captain&apos;s log</h2>{state.storyLog.slice(0, 30).map((entry, index) => <p key={index}>{entry}</p>)}</section></div></>;
 }
 
 type HiscoreScope = "all" | "patrol" | "weekly";
@@ -1315,7 +1312,7 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
 function StoryEvent({ eventId, onChoose }: { eventId: string; onChoose: (id: string) => void }) {
   const event = storyEvents[eventId as keyof typeof storyEvents];
   if (!event) return null;
-  return <section className="story-event panel"><Sparkles /><div><p className="eyebrow">SHIP EVENT</p><h2>{event.title}</h2><p>{event.text}</p><div>{event.choices.map((choice) => <Button key={choice.id} variant="outline" onClick={() => onChoose(choice.id)}>{choice.label}</Button>)}</div></div></section>;
+  return <section className="story-event panel"><Sparkles /><div><p className="eyebrow">SHIP EVENT · {event.purpose}</p><h2>{event.title}</h2><p>{event.text}</p><div>{event.choices.map((choice) => <Button key={choice.id} variant="outline" onClick={() => onChoose(choice.id)}>{choice.label}</Button>)}</div></div></section>;
 }
 
 function Stat({ icon: Icon, label, value }: { icon: typeof Coins; label: string; value: number }) {

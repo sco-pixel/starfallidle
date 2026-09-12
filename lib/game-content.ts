@@ -1,5 +1,5 @@
 import type { DroneId, EquipmentId, GameState, ShipModuleId, SkillId, VehicleId } from "./game-state";
-import { advancedActivities, bossActivities } from "./depth-content";
+import { advancedActivities, bossActivities, combatActivities } from "./depth-content";
 
 export type Activity = {
   id: string;
@@ -151,7 +151,7 @@ const coreActivities: Activity[] = [
   { id: "sentinel-city", skillId: "archaeology", name: "Sentinel City Survey", level: 20, seconds: 16, xp: 72, description: "Map the cultural layers beneath an active machine metropolis.", consumes: { relic: 4, powerCell: 2 }, produces: { artefact: 2, data: 6 }, sectors: ["silent"] },
 ];
 
-export const activities: Activity[] = [...coreActivities, ...advancedActivities, ...bossActivities];
+export const activities: Activity[] = [...coreActivities, ...combatActivities, ...advancedActivities, ...bossActivities];
 
 export const sectors = [
   { id: "erebus", name: "Erebus Belt", level: 1, fuel: 0, tone: "Industrial frontier", description: "Safe shipping lanes, training rocks and crowded salvage fields." },
@@ -252,21 +252,61 @@ export const expeditions: { id: string; name: string; minutes: number; level: nu
   { id: "machine-core", name: "Descend into the Machine Core", minutes: 35, level: 1000, description: "Reach the intelligence chamber beneath the Silent Systems.", cost: { singularityCore: 1, genesisCompound: 5, fuelRod: 10 }, reward: { commandToken: 1, voidData: 50 }, collection: "expedition-core", vehicle: "boardingShuttle" },
 ];
 
-export const storyEvents = {
+export type StoryEvent = { title: string; purpose: string; text: string; choices: { id: string; label: string; result: string; reward: Record<string, number>; morale: number; faction?: { id: string; reputation: number }; commandPoints?: number }[] };
+
+export const storyEvents: Record<string, StoryEvent> = {
   escapePod: {
     title: "The Unclaimed Escape Pod",
+    purpose: "Choose between navigation progress and Patrol reputation.",
     text: "A sealed pod broadcasts a century-old distress code. Its life signs are impossible.",
     choices: [
-      { id: "open", label: "Bring it aboard", result: "The pod contained an intact navigation core.", reward: { navData: 8 }, morale: -4 },
-      { id: "report", label: "Report it to Patrol", result: "Patrol Command records your restraint.", reward: { credits: 90 }, morale: 3 },
+      { id: "open", label: "Bring it aboard", result: "The pod contained an intact navigation core.", reward: { navData: 8, data: 3 }, morale: -4 },
+      { id: "report", label: "Report it to Patrol", result: "Patrol Command records your restraint.", reward: { credits: 90 }, morale: 3, faction: { id: "patrol", reputation: 4 } },
     ],
   },
   cargoNoise: {
     title: "Movement in the Cargo Hold",
+    purpose: "Choose a practical salvage gain or preserve crew morale.",
     text: "Something is moving behind a sealed salvage container.",
     choices: [
-      { id: "investigate", label: "Send the salvage team", result: "A maintenance drone reactivates and joins the ship.", reward: { droneParts: 5 }, morale: 2 },
-      { id: "vent", label: "Vent the container", result: "The threat is gone, along with some salvage.", reward: { salvage: -5 }, morale: -2 },
+      { id: "investigate", label: "Send the salvage team", result: "A maintenance drone reactivates and joins the ship.", reward: { droneParts: 5, circuits: 2 }, morale: 2 },
+      { id: "vent", label: "Vent the container", result: "The threat is gone, along with some salvage.", reward: { salvage: -5, medicine: 2 }, morale: -2 },
+    ],
+  },
+  frontierSignal: {
+    title: "Frontier Relay Signal",
+    purpose: "Choose a faction relationship or a direct economic reward.",
+    text: "An Erebus relay asks for a quiet escort. The contract is poorly funded but the signal is genuine.",
+    choices: [
+      { id: "escort", label: "Escort the relay tender", result: "The Frontier Compact marks the cruiser as dependable.", reward: { credits: 45, rations: 2 }, morale: 2, faction: { id: "frontier", reputation: 5 } },
+      { id: "sell", label: "Sell the route data", result: "Prospectors pay for the location before anyone else arrives.", reward: { credits: 150 }, morale: -1, faction: { id: "prospectors", reputation: 2 } },
+    ],
+  },
+  researchBreach: {
+    title: "Quarantine Sample Breach",
+    purpose: "Choose between a research material and a safer medical response.",
+    text: "A Helix specimen has breached its thermal cradle. It may be valuable, but it is not inert.",
+    choices: [
+      { id: "study", label: "Contain and study it", result: "The laboratory records a rare adaptive sequence.", reward: { catalyst: 4, data: 6 }, morale: -3, faction: { id: "institute", reputation: 4 } },
+      { id: "stabilise", label: "Stabilise the crew", result: "The crew completes the response drill without exposure.", reward: { medicine: 5 }, morale: 5 },
+    ],
+  },
+  corsairCipher: {
+    title: "Corsair Cipher",
+    purpose: "Choose a combat supply cache or an intelligence connection.",
+    text: "A weak corsair transmission repeats from an abandoned buoy. Its encryption is deliberately incomplete.",
+    choices: [
+      { id: "crack", label: "Crack the cipher", result: "The partial manifest opens a quiet line to the Cinder Corsairs.", reward: { data: 8 }, morale: -1, faction: { id: "corsairs", reputation: 5 } },
+      { id: "ambush", label: "Prepare an ambush", result: "The buoy was bait, but the cruiser recovers its ammunition cache.", reward: { missiles: 6, powerCell: 2 }, morale: 1 },
+    ],
+  },
+  veteranCeremony: {
+    title: "Veteran Crew Ceremony",
+    purpose: "Convert crew morale into a lasting commission benefit or immediate operational supplies.",
+    text: "The crew asks for a brief ceremony after another long patrol milestone. The bridge has time for one meaningful gesture.",
+    choices: [
+      { id: "commend", label: "Issue commendations", result: "The crew records the commission as one worth remembering.", reward: { credits: 60 }, morale: 8, commandPoints: 1 },
+      { id: "train", label: "Run a tactical drill", result: "The crew turns the occasion into a focused readiness exercise.", reward: { missiles: 4, medicine: 3 }, morale: 3 },
     ],
   },
 } as const;

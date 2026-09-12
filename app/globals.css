@@ -551,6 +551,11 @@ h3 { font-size: 1rem; }
 .combat-targets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .combat-target { padding: 15px; display: grid; gap: 10px; border-left: 2px solid #354456; }
 .combat-target.active { border-color: #d4a348; box-shadow: inset 0 0 28px rgba(212, 163, 72, .05); }
+.combat-target.available { border-left-color: #4d8d78; }
+.combat-target.unavailable { opacity: .78; }
+.combat-roster-heading { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; }
+.combat-roster-heading p, .combat-roster-heading h2 { grid-column: 1; }
+.combat-roster-heading span { grid-column: 2; grid-row: 1 / 3; max-width: 230px; color: #80909e; font: .65rem var(--font-mono); text-align: right; }
 .target-head { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; }
 .target-head > span { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #47586b; color: #d6a84e; }
 .target-head svg { width: 17px; }
@@ -564,6 +569,8 @@ h3 { font-size: 1rem; }
 .matchup-readout span { color: #9aa8b4; font: .62rem var(--font-mono); }
 .matchup-readout .advantage { color: #66c5a0; }
 .combat-target > small { color: #c4a45f; font: .64rem var(--font-mono); }
+.combat-unavailable, .combat-ready { min-height: 31px; padding: 7px 8px; border: 1px solid #3d3436; display: block; color: #d48d81; font: .63rem var(--font-mono); line-height: 1.35; background: #211314; }
+.combat-ready { border-color: #335c50; color: #75c6a5; background: #0b1c18; }
 .combat-target > button { width: 100%; border-radius: 0; }
 .combat-milestones { margin-top: 10px; padding: 14px; display: grid; grid-template-columns: 1.2fr repeat(4, 1fr); gap: 8px; align-items: stretch; }
 .combat-milestones > div:not(:first-child) { padding: 9px; border: 1px solid #2c3947; display: grid; gap: 3px; opacity: .48; }
@@ -734,8 +741,8 @@ h3 { font-size: 1rem; }
 .record-grid .log-record { grid-column: 1 / -1; }
 .log-record p { padding: 7px 0; border-bottom: 1px solid #23303e; color: #91a0af; font-size: .77rem; }
 
-.game-layout.v3.hiscores-mode { grid-template-columns: minmax(0, 1fr); max-width: 1580px; }
-.hiscores-layout { display: grid; grid-template-columns: 238px minmax(470px, 1fr) 244px; gap: 11px; align-items: start; }
+.game-layout.v3.hiscores-mode { grid-template-columns: 246px minmax(520px, 1fr); max-width: 1660px; }
+.hiscores-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 11px; align-items: start; }
 .hiscore-categories { overflow: hidden; }
 .hiscore-search { padding: 13px; border-bottom: 1px solid #2a3847; display: grid; gap: 7px; }
 .hiscore-search > label { color: #aab6c2; font: 700 .69rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
@@ -796,7 +803,7 @@ h3 { font-size: 1rem; }
 .hiscore-pagination > span { color: #8492a0; font: .67rem var(--font-mono); }
 .hiscore-pagination > span strong { color: #d2dae1; }
 
-.hiscore-personal { display: grid; gap: 10px; }
+.hiscore-personal { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; }
 .personal-rank { padding: 16px; border-color: #6a542c; background: linear-gradient(150deg, #2a21136e, #0a1119 58%); }
 .personal-rank-number { min-height: 80px; margin-top: 11px; padding: 11px; border: 1px solid #59472b; display: grid; grid-template-columns: 29px 1fr; gap: 1px 9px; align-items: center; }
 .personal-rank-number svg { grid-row: 1 / 3; width: 26px; color: #e0ad4e; }
@@ -872,6 +879,8 @@ h3 { font-size: 1rem; }
   .loadout-grid, .effect-grid, .path-grid { grid-template-columns: 1fr; }
   .combat-summary { grid-template-columns: 1fr; }
   .combat-operation, .combat-control, .combat-targets, .combat-milestones { grid-template-columns: 1fr; }
+  .combat-roster-heading { grid-template-columns: 1fr; }
+  .combat-roster-heading span { grid-column: 1; grid-row: auto; max-width: none; text-align: left; }
   .combat-control .retreat-control { grid-column: 1; }
   .target-stats { grid-template-columns: repeat(2, 1fr); }
   .faction-strip { grid-template-columns: repeat(2, 1fr); }

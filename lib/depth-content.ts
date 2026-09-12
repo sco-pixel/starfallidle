@@ -73,6 +73,35 @@ export const bossActivities: Activity[] = [
   { id: "boss-machine-intelligence", skillId: "combat", name: "Machine Intelligence Core", level: 100, seconds: 60, xp: 1100, description: "Confront the coordinating intelligence beneath the Silent Systems.", produces: { singularityCore: 2, ancientCore: 5 }, credits: 1400, damage: 140, sectors: ["silent"], enemy: { hull: 2400, shields: 800, armor: 160, evasion: 28, class: "Final Boss", weakness: "missile", rareEvery: 20, rareDrop: { gearStarfallCrown: 1 } }, collectionId: "boss-core" },
 ];
 
+const combatTargetNames = [
+  "Ore Jacker", "Drift Marauder", "Gravimetric Mine", "Prospector Ambush", "Relay Sentry", "Helix Quarantine Drone", "Spore Skiff", "Corsair Cutter", "Relic Guardian", "Helix Interceptor", "Cinder Gunboat", "Rift Scavenger", "Corsair Boarding Craft", "Quarantine Destroyer", "Phase Raider", "Corsair Corvette", "Rift Lancer", "Helix Bio-Drone", "Cinder Escort", "Orpheus Warden", "Rift Harvester", "Corsair Strike Frigate", "Phase Stalker", "Temporal Corsair", "Rift Survey Dread", "Sentinel Scout", "Machine Boarding Pod", "Silent Skirmisher", "Sentinel Hunter", "Machine Rail Platform", "Silent Systems Frigate", "Sentinel Custodian", "Machine Breacher", "Void Cartographer", "Silent Dreadnought",
+] as const;
+const combatTargetLevels = [2, 3, 5, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32, 35, 38, 40, 43, 48, 50, 53, 55, 58, 62, 65, 68, 70, 73, 78, 82, 86, 92, 96] as const;
+const combatWeaknesses = ["laser", "railgun", "missile"] as const;
+
+export const combatActivities: Activity[] = combatTargetNames.map((name, index) => {
+  const level = combatTargetLevels[index];
+  const stage = Math.floor(index / 7);
+  const sector = index < 7 ? ["erebus"] : index < 14 ? ["helix", "cinder"] : index < 22 ? ["cinder", "orpheus"] : index < 29 ? ["orpheus", "silent"] : ["silent"];
+  const className = stage === 0 ? "Raider" : stage === 1 ? "Hostile Drone" : stage === 2 ? "Corsair Vessel" : stage === 3 ? "Rift Hostile" : "Sentinel Vessel";
+  const base = 38 + index * 23;
+  return {
+    id: `combat-contact-${String(index + 1).padStart(2, "0")}`,
+    skillId: "combat",
+    name,
+    level,
+    seconds: 7 + Math.floor(index / 3),
+    xp: 20 + index * 13,
+    description: `${className} contact operating inside the established ${stage < 1 ? "frontier" : stage < 2 ? "quarantine frontier" : stage < 3 ? "Cinder and Orpheus lanes" : stage < 4 ? "rift approaches" : "Silent Systems"}.`,
+    produces: index < 10 ? { salvage: 2 + stage, circuits: stage } : index < 22 ? { plating: 1 + stage, circuits: 2 + stage } : index < 30 ? { relic: 1 + stage, data: 3 + stage } : { quantumCircuit: 1 + stage, ancientCore: stage > 4 ? 1 : 0 },
+    credits: 10 + index * 14,
+    damage: 8 + index * 3,
+    sectors: sector,
+    enemy: { hull: base * 3, shields: base + stage * 18, armor: 4 + index * 3, evasion: 5 + (index * 7) % 34, class: className, weakness: combatWeaknesses[index % combatWeaknesses.length], rareEvery: 10 + stage * 2, rareDrop: index < 12 ? { droneParts: 1 + stage } : index < 24 ? { powerCell: 2 + stage, relic: 1 } : { voidData: 2 + stage, quantumDust: stage > 3 ? 1 : 0 } },
+    collectionId: `enemy-contact-${String(index + 1).padStart(2, "0")}`,
+  };
+});
+
 export const uniqueGear = {
   gearPhaseLance: { name: "Phase Lance", effect: "+12% combat accuracy" },
   gearLivingBulwark: { name: "Living Bulwark", effect: "15% less incoming damage" },
