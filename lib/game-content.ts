@@ -164,15 +164,15 @@ export const sectors = [
 ];
 
 export const shipModules: Record<ShipModuleId, { name: string; description: string; effect: (level: number) => string }> = {
-  bridge: { name: "Bridge", description: "Deck 1 command bridge with helm, tactical and patrol-control stations.", effect: () => "Command station — no separate numeric bonus." },
+  bridge: { name: "Bridge", description: "Deck 1 command bridge with helm, tactical and patrol-control stations.", effect: (level) => `+${level} Astrogation, Logistics and Diplomacy output.` },
   cic: { name: "Combat Information Centre", description: "Deck 1 tactical centre coordinating sensors, weapons and drone swarms.", effect: (level) => `+${level} combat accuracy and -${level} incoming combat damage.` },
   cargo: { name: "Cargo Bay", description: "Deck 3 modular 200-ton hold with magnetic restraints, lift and vehicle access.", effect: (level) => `+${level * 2}% station sale value.` },
-  hydroponics: { name: "Hydroponics", description: "Deck 2 life-support gardens supplying fresh food, herbs and atmosphere support.", effect: () => "Life-support facility — no separate numeric bonus." },
-  fabricator: { name: "Fabrication Deck", description: "Deck 4 machine shop for component manufacture, field repairs and refits.", effect: () => "Engineering facility — no separate numeric bonus." },
-  lab: { name: "Science Laboratory", description: "Deck 3 analysis lab for samples, anomalies, archaeology and research work.", effect: () => "Research facility — no separate numeric bonus." },
-  medbay: { name: "Medical Bay", description: "Deck 3 auto-doc, trauma bay and isolation space for the ten-person crew.", effect: () => "Medical facility — no separate numeric bonus." },
+  hydroponics: { name: "Hydroponics", description: "Deck 2 life-support gardens supplying fresh food, herbs and atmosphere support.", effect: (level) => `+${level} Xenobotany and Biochemistry output.` },
+  fabricator: { name: "Fabrication Deck", description: "Deck 4 machine shop for component manufacture, field repairs and refits.", effect: (level) => `+${level} Engineering, Metallurgy and Drones output.` },
+  lab: { name: "Science Laboratory", description: "Deck 3 analysis lab for samples, anomalies, archaeology and research work.", effect: (level) => `+${level} Science and Archaeology output.` },
+  medbay: { name: "Medical Bay", description: "Deck 3 auto-doc, trauma bay and isolation space for the ten-person crew.", effect: (level) => `+${level} Medicine output and +${level} morale restored per Medicine action.` },
   reactor: { name: "Antimatter Reactor", description: "Deck 4 power plant feeding propulsion, shields and every ship system.", effect: (level) => `Upgrade adds 10 maximum hull; current hull capacity is ${100 + Math.max(0, level - 1) * 10}.` },
-  hangar: { name: "Vehicle & Drone Bay", description: "Deck 3 storage and launch support for two rovers and the ship's drone swarms.", effect: () => "Operations bay — no separate numeric bonus." },
+  hangar: { name: "Vehicle & Drone Bay", description: "Deck 3 storage and launch support for two rovers and the ship's drone swarms.", effect: (level) => `+${level} Drones output.` },
 };
 
 export const crew = [
@@ -188,25 +188,25 @@ export const crew = [
   { id: "anya", name: "Anya Sato", role: "Archaeologist", trait: "Old Languages", specialties: ["archaeology", "science"] as SkillId[], bio: "Anya can identify a civilisation from a hinge, a glyph or a burial pattern.", perk: "Contextual recall: +1 output in Archaeology or Science." },
 ];
 
-export const droneSpecs: Record<DroneId, { name: string; description: string; cost: Record<string, number> }> = {
-  mining: { name: "Mining Drone", description: "Adds passive yield to ore extraction.", cost: { droneParts: 3, powerCell: 1 } },
-  salvage: { name: "Salvage Drone", description: "Recovers extra intact components.", cost: { droneParts: 3, circuits: 2 } },
-  survey: { name: "Survey Probe", description: "Improves science and sector discovery.", cost: { droneParts: 2, data: 4 } },
-  combat: { name: "Combat Drone", description: "Reduces damage during hostile actions.", cost: { droneParts: 4, plating: 2, powerCell: 1 } },
-  cargo: { name: "Cargo Loader", description: "Improves logistics and market returns.", cost: { droneParts: 3, plating: 2 } },
+export const droneSpecs: Record<DroneId, { name: string; description: string; effect: (count: number) => string; cost: Record<string, number> }> = {
+  mining: { name: "Mining Drone", description: "Autonomous ore-cutting support for mining crews.", effect: (count) => `+${count} Mining output.`, cost: { droneParts: 3, powerCell: 1 } },
+  salvage: { name: "Salvage Drone", description: "Retrieves intact components from unstable wreckage.", effect: (count) => `+${count} Salvage output.`, cost: { droneParts: 3, circuits: 2 } },
+  survey: { name: "Survey Probe", description: "Maps anomalies and samples distant sites ahead of the crew.", effect: (count) => `+${count} Science and Archaeology output.`, cost: { droneParts: 2, data: 4 } },
+  combat: { name: "Combat Drone", description: "Interposes defensive fire during hostile vessel actions.", effect: (count) => `-${count * 2} incoming combat damage and +${count} combat accuracy.`, cost: { droneParts: 4, plating: 2, powerCell: 1 } },
+  cargo: { name: "Cargo Loader", description: "Automates secure loading, sorting and cargo transfer.", effect: (count) => `+${count} Logistics output.`, cost: { droneParts: 3, plating: 2 } },
 };
 
-export const vehicleSpecs: Record<VehicleId, { name: string; description: string; cost: Record<string, number> }> = {
-  rover: { name: "Planetary Rover", description: "Carries a survey team across hostile planetary surfaces.", cost: { plating: 6, circuits: 5, powerCell: 2 } },
-  boardingShuttle: { name: "Boarding Shuttle", description: "Transfers crew safely to derelicts, stations and alien structures.", cost: { plating: 10, circuits: 8, powerCell: 4 } },
+export const vehicleSpecs: Record<VehicleId, { name: string; description: string; effect: (count: number) => string; cost: Record<string, number> }> = {
+  rover: { name: "Planetary Rover", description: "Carries a survey team across hostile planetary surfaces and unlocks rover expeditions.", effect: (count) => `+${count} Mining and Salvage output.`, cost: { plating: 6, circuits: 5, powerCell: 2 } },
+  boardingShuttle: { name: "Boarding Shuttle", description: "Transfers crew safely to derelicts, stations and alien structures and unlocks boarding expeditions.", effect: (count) => `+${count} Archaeology and Diplomacy output.`, cost: { plating: 10, circuits: 8, powerCell: 4 } },
 };
 
-export const equipmentSpecs: Record<EquipmentId, { name: string; description: string }> = {
-  cutter: { name: "Plasma Cutter", description: "Mining and salvage yield" },
-  exosuit: { name: "Boarding Rig", description: "Combat protection and damage" },
-  scanner: { name: "Survey Array", description: "Science and xenobotany yield" },
-  railgun: { name: "Coil Railgun", description: "Armour damage and combat speed" },
-  shield: { name: "Deflector Grid", description: "Reduces incoming combat damage" },
+export const equipmentSpecs: Record<EquipmentId, { name: string; description: string; effect: (level: number) => string }> = {
+  cutter: { name: "Plasma Cutter", description: "Heavy plasma tooling for extraction and cutting work.", effect: (level) => `+${Math.max(0, level - 1)} Mining and Salvage output from upgrades.` },
+  exosuit: { name: "Boarding Rig", description: "Armoured work suit used during dangerous shipboard actions.", effect: (level) => `-${level} incoming combat damage.` },
+  scanner: { name: "Survey Array", description: "Long-range sensors tuned for samples, anomalies and ruins.", effect: (level) => `+${Math.max(0, level - 1)} Science, Xenobotany and Archaeology output from upgrades.` },
+  railgun: { name: "Coil Railgun", description: "Primary kinetic weapon with a progressively faster cycling system.", effect: (level) => `+${level * 2} combat accuracy, +${level} combat credits, and ${Math.max(0, level - 1) * 2.5}% faster encounters.` },
+  shield: { name: "Deflector Grid", description: "Directional energy shielding for sustained hostile actions.", effect: (level) => `-${level * 2} incoming combat damage and ${40 + level * 10} maximum shields after repair.` },
 };
 
 export const researchNodes: { id: string; name: string; description: string; cost: Record<string, number>; requires: string[] }[] = [
