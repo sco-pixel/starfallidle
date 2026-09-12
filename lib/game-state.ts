@@ -84,6 +84,8 @@ const startingInventory: Record<string, number> = {
   quantumCircuit: 0, ancientCore: 0, xenoFiber: 0, neuralGel: 0, quantumParts: 0,
   titaniumPlate: 0, quantumAlloy: 0, neutroniumPlate: 0, singularityCore: 0,
   genesisCompound: 0, voidData: 0, commandToken: 0,
+  phaseFilament: 0, bioLumen: 0, voidLens: 0, sentinelCipher: 0,
+  riftAlloy: 0, phaseLattice: 0, repairNanites: 0,
   gearPhaseLance: 0, gearLivingBulwark: 0, gearChronoDrive: 0, gearFoundryHeart: 0, gearStarfallCrown: 0,
 };
 

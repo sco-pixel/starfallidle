@@ -46,7 +46,9 @@ export const itemNames: Record<string, string> = {
   neutronium: "Neutronium", quantumCircuit: "Quantum Circuits", ancientCore: "Ancient Cores", xenoFiber: "Xeno-fibre",
   neuralGel: "Neural Gel", quantumParts: "Quantum Components", titaniumPlate: "Titanium Plating", quantumAlloy: "Quantum Alloy",
   neutroniumPlate: "Neutronium Plating", singularityCore: "Singularity Cores", genesisCompound: "Genesis Compound",
-  voidData: "Void Data", commandToken: "Command Token", gearPhaseLance: "Phase Lance", gearLivingBulwark: "Living Bulwark",
+  voidData: "Void Data", commandToken: "Command Token", phaseFilament: "Phase Filament", bioLumen: "Bio-lumen",
+  voidLens: "Void Lens", sentinelCipher: "Sentinel Cipher", riftAlloy: "Rift Alloy", phaseLattice: "Phase Lattice", repairNanites: "Repair Nanites",
+  gearPhaseLance: "Phase Lance", gearLivingBulwark: "Living Bulwark",
   gearChronoDrive: "Chrono Drive", gearFoundryHeart: "Foundry Heart", gearStarfallCrown: "Starfall Crown",
 };
 
