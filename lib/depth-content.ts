@@ -121,4 +121,9 @@ export const missionDefinitions = [
   { id: "corsair-accord", name: "Corsair Accord", description: "Complete 10 contracts and reach Diplomacy level 25.", reward: { phaseCrystal: 6, credits: 1100 } },
   { id: "rift-cartographer", name: "The Rift Cartographer", description: "Reach Astrogation level 45 and complete 6 expeditions.", reward: { voidData: 16, quantumCircuit: 6 } },
   { id: "silent-witness", name: "Silent Witness", description: "Record 55 discoveries and defeat the Rift Leviathan.", reward: { ancientCore: 3, credits: 2200 } },
+  { id: "erebus-oath", name: "The Erebus Oath", description: "Complete 3 contracts and reach Logistics level 12.", reward: { fuelRod: 6, credits: 450 } },
+  { id: "helix-quarantine", name: "The Quarantine Line", description: "Complete the Quarantine Field Study and reach Medicine level 18.", reward: { catalyst: 10, neuralGel: 5 } },
+  { id: "cinder-mercy", name: "Cinder Mercy", description: "Complete the Cinder Distress Run and defeat 25 corsair targets.", reward: { plating: 12, credits: 850 } },
+  { id: "rift-probe-recovered", name: "The Lost Probe", description: "Complete the Rift Probe expedition and reach Science level 32.", reward: { phaseCrystal: 10, voidData: 8 } },
+  { id: "silent-archive-protocol", name: "Archive Protocol", description: "Complete the Silent Archive expedition and reach Archaeology level 40.", reward: { quantumCircuit: 12, ancientCore: 2 } },
 ] as const;

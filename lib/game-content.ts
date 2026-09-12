@@ -239,20 +239,31 @@ export const contracts: { id: string; faction: string; name: string; description
   { id: "corsair-manifest", faction: "corsairs", name: "Corsair Manifest", description: "Trade recovered artefacts for a verified route manifest.", cost: { relic: 8, artefact: 1, salvage: 30 }, reward: { credits: 610, reputation: 12 } },
   { id: "silent-relay", faction: "frontier", name: "Silent Relay Lifeline", description: "Keep a remote relay supplied in machine territory.", cost: { fuelRod: 5, circuits: 10, medicine: 6 }, reward: { credits: 760, reputation: 16 } },
   { id: "institute-specimens", faction: "institute", name: "Institute Specimen Vault", description: "Deliver stabilised xenological samples.", cost: { catalyst: 8, neuralGel: 3, data: 20 }, reward: { credits: 820, reputation: 17 } },
+  { id: "erebus-rescue", faction: "patrol", name: "Erebus Rescue Stores", description: "Stock a patrol tender preparing for emergency departures.", cost: { rations: 14, medicine: 5, fuelRod: 2 }, reward: { credits: 340, reputation: 11 } },
+  { id: "helix-cold-chain", faction: "institute", name: "Helix Cold Chain", description: "Deliver sterile storage materials to the quarantine research teams.", cost: { medicine: 8, data: 12, powerCell: 3 }, reward: { credits: 490, reputation: 13 } },
+  { id: "cinder-hullwork", faction: "frontier", name: "Cinder Hullwork", description: "Provide plating and coils for a civilian convoy's emergency repair.", cost: { plating: 12, circuits: 9, salvage: 20 }, reward: { credits: 570, reputation: 14 } },
+  { id: "rift-instruments", faction: "prospectors", name: "Rift Instrument Package", description: "Supply precision instruments for a risky mineral assay.", cost: { iridium: 10, data: 14, powerCell: 4 }, reward: { credits: 680, reputation: 15 } },
+  { id: "silent-shielding", faction: "patrol", name: "Silent Shielding Reserve", description: "Equip a patrol relay against machine interference.", cost: { cobalt: 24, plating: 14, powerCell: 6 }, reward: { credits: 880, reputation: 18 } },
+  { id: "corsair-salvage-ledger", faction: "corsairs", name: "Corsair Salvage Ledger", description: "Trade a carefully documented cache of recovered ship components.", cost: { salvage: 40, circuits: 14, relic: 5 }, reward: { credits: 940, reputation: 16 } },
 ];
 
-export const expeditions: { id: string; name: string; minutes: number; level: number; description: string; cost: Record<string, number>; reward: Record<string, number>; collection: string; vehicle?: VehicleId }[] = [
-  { id: "colony-ship", name: "Board the Colony Ship", minutes: 2, level: 8, description: "Search an unpowered habitat ring.", cost: { rations: 2, medicine: 1 }, reward: { salvage: 12, data: 5 }, collection: "expedition-colony" },
-  { id: "uncharted-moon", name: "Survey the Uncharted Moon", minutes: 4, level: 18, description: "Deploy a rover beyond beacon range.", cost: { fuelRod: 1, rations: 4 }, reward: { cobalt: 8, catalyst: 3 }, collection: "expedition-moon", vehicle: "rover" },
-  { id: "alien-structure", name: "Enter the Alien Structure", minutes: 7, level: 38, description: "Take a multidisciplinary team below the surface.", cost: { powerCell: 2, medicine: 3, data: 8 }, reward: { relic: 8, artefact: 1 }, collection: "expedition-structure", vehicle: "boardingShuttle" },
-  { id: "jump-gate", name: "Repair the Broken Gate", minutes: 10, level: 60, description: "Restore a pre-collapse transit gate.", cost: { plating: 8, circuits: 8, fuelRod: 3 }, reward: { artefact: 3, navData: 15 }, collection: "expedition-gate", vehicle: "boardingShuttle" },
-  { id: "phase-storm", name: "Cross the Phase Storm", minutes: 14, level: 180, description: "Escort a science team through a repeating spatial front.", cost: { fuelRod: 4, medicine: 5, phaseCrystal: 3 }, reward: { voidData: 12, quantumDust: 8 }, collection: "expedition-storm", vehicle: "boardingShuttle" },
-  { id: "bioship-remains", name: "Enter the Bio-Ship", minutes: 18, level: 320, description: "Recover living technology after a successful containment battle.", cost: { medicine: 8, neuralGel: 4, powerCell: 5 }, reward: { xenoFiber: 18, genesisCompound: 4 }, collection: "expedition-bioship", vehicle: "boardingShuttle" },
-  { id: "sentinel-foundry", name: "Raid the Foundry Interior", minutes: 24, level: 600, description: "Send a boarding team into an active machine production line.", cost: { neutroniumPlate: 3, medicine: 10, missiles: 15 }, reward: { ancientCore: 6, quantumParts: 15 }, collection: "expedition-foundry", vehicle: "boardingShuttle" },
-  { id: "machine-core", name: "Descend into the Machine Core", minutes: 35, level: 1000, description: "Reach the intelligence chamber beneath the Silent Systems.", cost: { singularityCore: 1, genesisCompound: 5, fuelRod: 10 }, reward: { commandToken: 1, voidData: 50 }, collection: "expedition-core", vehicle: "boardingShuttle" },
+export const expeditions: { id: string; name: string; minutes: number; level: number; description: string; cost: Record<string, number>; reward: Record<string, number>; collection: string; skill: SkillId; xp: number; vehicle?: VehicleId }[] = [
+  { id: "colony-ship", name: "Board the Colony Ship", minutes: 2, level: 8, description: "Search an unpowered habitat ring.", cost: { rations: 2, medicine: 1 }, reward: { salvage: 12, data: 5 }, collection: "expedition-colony", skill: "salvage", xp: 160 },
+  { id: "erebus-debris", name: "Map the Debris Wake", minutes: 3, level: 12, description: "Trace a dangerous drift corridor through the Erebus patrol route.", cost: { rations: 3, data: 3 }, reward: { navData: 6, salvage: 8 }, collection: "expedition-debris", skill: "astrogation", xp: 220 },
+  { id: "uncharted-moon", name: "Survey the Uncharted Moon", minutes: 4, level: 18, description: "Deploy a rover beyond beacon range.", cost: { fuelRod: 1, rations: 4 }, reward: { cobalt: 8, catalyst: 3 }, collection: "expedition-moon", skill: "mining", xp: 300, vehicle: "rover" },
+  { id: "helix-quarantine", name: "Quarantine Field Study", minutes: 5, level: 26, description: "Observe a Helix bloom without disturbing its containment field.", cost: { medicine: 3, data: 6 }, reward: { catalyst: 6, neuralGel: 2 }, collection: "expedition-quarantine", skill: "medicine", xp: 420, vehicle: "rover" },
+  { id: "alien-structure", name: "Enter the Alien Structure", minutes: 7, level: 38, description: "Take a multidisciplinary team below the surface.", cost: { powerCell: 2, medicine: 3, data: 8 }, reward: { relic: 8, artefact: 1 }, collection: "expedition-structure", skill: "archaeology", xp: 650, vehicle: "boardingShuttle" },
+  { id: "cinder-distress", name: "Cinder Distress Run", minutes: 8, level: 48, description: "Reach a stranded civilian crew before the Expanse takes their ship.", cost: { rations: 6, medicine: 4, fuelRod: 2 }, reward: { credits: 260, plating: 5 }, collection: "expedition-distress", skill: "diplomacy", xp: 780, vehicle: "boardingShuttle" },
+  { id: "jump-gate", name: "Repair the Broken Gate", minutes: 10, level: 60, description: "Restore a pre-collapse transit gate.", cost: { plating: 8, circuits: 8, fuelRod: 3 }, reward: { artefact: 3, navData: 15 }, collection: "expedition-gate", skill: "engineering", xp: 1000, vehicle: "boardingShuttle" },
+  { id: "rift-probe", name: "Recover the Rift Probe", minutes: 12, level: 95, description: "Recover a lost science probe from unstable Orpheus spacetime.", cost: { powerCell: 4, data: 16, phaseCrystal: 2 }, reward: { voidData: 10, quantumDust: 4 }, collection: "expedition-probe", skill: "science", xp: 1400, vehicle: "boardingShuttle" },
+  { id: "phase-storm", name: "Cross the Phase Storm", minutes: 14, level: 180, description: "Escort a science team through a repeating spatial front.", cost: { fuelRod: 4, medicine: 5, phaseCrystal: 3 }, reward: { voidData: 12, quantumDust: 8 }, collection: "expedition-storm", skill: "astrogation", xp: 2000, vehicle: "boardingShuttle" },
+  { id: "bioship-remains", name: "Enter the Bio-Ship", minutes: 18, level: 320, description: "Recover living technology after a successful containment battle.", cost: { medicine: 8, neuralGel: 4, powerCell: 5 }, reward: { xenoFiber: 18, genesisCompound: 4 }, collection: "expedition-bioship", skill: "biochemistry", xp: 3000, vehicle: "boardingShuttle" },
+  { id: "silent-archive", name: "Decode the Silent Archive", minutes: 21, level: 460, description: "Interpret an isolated machine archive before its defence routine wakes.", cost: { data: 30, relic: 12, medicine: 8 }, reward: { ancientCore: 3, quantumCircuit: 10 }, collection: "expedition-archive", skill: "archaeology", xp: 4200, vehicle: "boardingShuttle" },
+  { id: "sentinel-foundry", name: "Raid the Foundry Interior", minutes: 24, level: 600, description: "Send a boarding team into an active machine production line.", cost: { neutroniumPlate: 3, medicine: 10, missiles: 15 }, reward: { ancientCore: 6, quantumParts: 15 }, collection: "expedition-foundry", skill: "combat", xp: 6000, vehicle: "boardingShuttle" },
+  { id: "machine-core", name: "Descend into the Machine Core", minutes: 35, level: 1000, description: "Reach the intelligence chamber beneath the Silent Systems.", cost: { singularityCore: 1, genesisCompound: 5, fuelRod: 10 }, reward: { commandToken: 1, voidData: 50 }, collection: "expedition-core", skill: "science", xp: 10000, vehicle: "boardingShuttle" },
 ];
 
-export type StoryEvent = { title: string; purpose: string; text: string; choices: { id: string; label: string; result: string; reward: Record<string, number>; morale: number; faction?: { id: string; reputation: number }; commandPoints?: number }[] };
+export type StoryEvent = { title: string; purpose: string; text: string; choices: { id: string; label: string; result: string; reward: Record<string, number>; morale: number; faction?: { id: string; reputation: number }; commandPoints?: number; xp?: { skill: SkillId; amount: number } }[] };
 
 export const storyEvents: Record<string, StoryEvent> = {
   escapePod: {
@@ -309,6 +320,60 @@ export const storyEvents: Record<string, StoryEvent> = {
       { id: "train", label: "Run a tactical drill", result: "The crew turns the occasion into a focused readiness exercise.", reward: { missiles: 4, medicine: 3 }, morale: 3 },
     ],
   },
+  gravityWake: {
+    title: "Unstable Gravity Wake",
+    purpose: "Turn a navigation hazard into Astrogation or Engineering experience.",
+    text: "A short-lived gravity wake is pulling loose hardware across the cruiser’s intended route.",
+    choices: [
+      { id: "thread", label: "Thread the wake", result: "The bridge records a clean traversal solution.", reward: { navData: 5 }, morale: 1, xp: { skill: "astrogation", amount: 180 } },
+      { id: "brace", label: "Brace the cruiser", result: "Engineering turns the wake into a live stress-test of the ship’s systems.", reward: { plating: 2, circuits: 2 }, morale: 0, xp: { skill: "engineering", amount: 180 } },
+    ],
+  },
+  roverTransmission: {
+    title: "Rover Transmission",
+    purpose: "Choose useful field data or practical mining experience.",
+    text: "One of the stored rovers receives a narrow-band transmission from an old survey cache.",
+    choices: [
+      { id: "survey", label: "Run a remote survey", result: "The rover reconstructs a useful geological profile.", reward: { data: 6, cobalt: 3 }, morale: 1, xp: { skill: "science", amount: 170 } },
+      { id: "drill", label: "Follow the mineral trace", result: "The cache leads the rover to a dense ore seam.", reward: { ferrite: 10 }, morale: 0, xp: { skill: "mining", amount: 170 } },
+    ],
+  },
+  crewDebate: {
+    title: "Mess Hall Debate",
+    purpose: "Settle a crew dispute with Diplomacy or deepen a research lead.",
+    text: "A debate over an Institute transmission has divided the mess hall into two stubborn camps.",
+    choices: [
+      { id: "mediate", label: "Mediate the discussion", result: "The crew leaves with a clear decision and renewed trust in command.", reward: { credits: 45 }, morale: 5, xp: { skill: "diplomacy", amount: 160 } },
+      { id: "investigate", label: "Check the transmission", result: "The argument was caused by an unusual pattern hidden in the signal.", reward: { data: 7 }, morale: -1, xp: { skill: "science", amount: 160 } },
+    ],
+  },
+  derelictBeacon: {
+    title: "Derelict Beacon",
+    purpose: "Recover salvage or train the crew in cautious archaeology.",
+    text: "A derelict beacon pings a protocol that predates every known sector authority.",
+    choices: [
+      { id: "strip", label: "Strip the beacon", result: "The beacon’s casing yields intact components.", reward: { salvage: 9, circuits: 3 }, morale: 0, xp: { skill: "salvage", amount: 190 } },
+      { id: "document", label: "Document the markings", result: "The markings reveal an otherwise lost patrol route designation.", reward: { relic: 2, navData: 3 }, morale: 1, xp: { skill: "archaeology", amount: 190 } },
+    ],
+  },
+  hydroponicBloom: {
+    title: "Hydroponic Bloom",
+    purpose: "Use a surprise crop for Xenobotany or Biochemistry experience.",
+    text: "A sealed grow tray has produced an unfamiliar, rapidly adapting vine overnight.",
+    choices: [
+      { id: "cultivate", label: "Cultivate the bloom", result: "The hydroponics deck adapts the growth medium without losing the crop.", reward: { rations: 6, catalyst: 2 }, morale: 2, xp: { skill: "botany", amount: 175 } },
+      { id: "sample", label: "Take a sample", result: "Biochemistry isolates a useful catalyst from the vine’s defence response.", reward: { medicine: 3, catalyst: 3 }, morale: -1, xp: { skill: "biochemistry", amount: 175 } },
+    ],
+  },
+  droneGhost: {
+    title: "Drone Ghost Signal",
+    purpose: "Improve drone control or prepare for a hostile encounter.",
+    text: "The CIC detects an apparently empty drone swarm matching the Aethelgard’s own control language.",
+    choices: [
+      { id: "sync", label: "Synchronise with it", result: "The controller extracts a cleaner swarm-routing model.", reward: { droneParts: 4, data: 4 }, morale: 1, xp: { skill: "drones", amount: 200 } },
+      { id: "drill", label: "Run a defence drill", result: "Fire control rehearses the response without giving the signal a way in.", reward: { missiles: 3 }, morale: 0, xp: { skill: "combat", amount: 200 } },
+    ],
+  },
 } as const;
 
 export const collectionEntries = [
@@ -323,6 +388,9 @@ export const collectionEntries = [
   ["boss-foundry", "Disabled Sentinel Foundry", "Bosses"], ["boss-core", "Machine Intelligence Core", "Bosses"],
   ["expedition-storm", "Phase Storm Crossing", "Expeditions"], ["expedition-bioship", "Bio-Ship Interior", "Expeditions"],
   ["expedition-foundry", "Foundry Interior", "Expeditions"], ["expedition-core", "Core Descent", "Expeditions"],
+  ["expedition-debris", "Debris Wake Map", "Expeditions"], ["expedition-moon", "Uncharted Moon Survey", "Expeditions"],
+  ["expedition-quarantine", "Quarantine Field Study", "Expeditions"], ["expedition-distress", "Cinder Distress Run", "Expeditions"],
+  ["expedition-probe", "Recovered Rift Probe", "Expeditions"], ["expedition-archive", "Silent Archive", "Expeditions"],
 ] as const;
 
 export function totalLevel(state: GameState) {

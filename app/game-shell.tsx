@@ -128,6 +128,14 @@ const objectives: Objective[] = [
   { id: "rift-surveyor", sector: "Orpheus Rift", name: "Rift Surveyor", description: "Reach Astrogation level 16", reward: "5 Phase Crystals", met: (s) => s.skills.astrogation.level >= 16, item: "phaseCrystal", amount: 5 },
   { id: "silent-network", sector: "Silent Systems", name: "Silent Network", description: "Build any Silent Systems outpost", reward: "8 Quantum Circuits", met: (s) => Boolean(s.outposts.silent), item: "quantumCircuit", amount: 8 },
   { id: "veteran-specialists", sector: "Patrol", name: "Veteran Specialists", description: "Train three crew members to level 10", reward: "500 credits", met: (s) => Object.values(s.crewXp).filter((xp) => crewLevel(xp) >= 10).length >= 3, credits: 500 },
+  { id: "ore-reserve", sector: "Erebus Belt", name: "Ore Reserve", description: "Store 80 Cobalt Crystals", reward: "250 credits", met: (s) => s.inventory.cobalt >= 80, credits: 250 },
+  { id: "first-convoy", sector: "Erebus Belt", name: "Convoy Hand", description: "Complete 2 faction contracts", reward: "3 Fuel Rods", met: (s) => s.contractsCompleted.length >= 2, item: "fuelRod", amount: 3 },
+  { id: "helix-containment", sector: "Helix Reach", name: "Containment Ready", description: "Reach Medicine level 10", reward: "8 Medkits", met: (s) => s.skills.medicine.level >= 10, item: "medicine", amount: 8 },
+  { id: "helix-swarm", sector: "Helix Reach", name: "Swarm Discipline", description: "Build 3 Survey Drones", reward: "8 Drone Parts", met: (s) => s.drones.survey >= 3, item: "droneParts", amount: 8 },
+  { id: "cinder-shipwright", sector: "Cinder Expanse", name: "Cinder Shipwright", description: "Upgrade any deck module to MK 4", reward: "450 credits", met: (s) => Object.values(s.shipModules).some((level) => level >= 4), credits: 450 },
+  { id: "cinder-relief", sector: "Cinder Expanse", name: "Relief Runner", description: "Complete the Cinder Distress Run", reward: "6 Alloy Plating", met: (s) => s.collection.includes("expedition-distress"), item: "plating", amount: 6 },
+  { id: "rift-protocol", sector: "Orpheus Rift", name: "Rift Protocol", description: "Reach Science level 20", reward: "6 Phase Crystals", met: (s) => s.skills.science.level >= 20, item: "phaseCrystal", amount: 6 },
+  { id: "silent-decoder", sector: "Silent Systems", name: "Silent Decoder", description: "Complete the Silent Archive expedition", reward: "2 Ancient Cores", met: (s) => s.collection.includes("expedition-archive"), item: "ancientCore", amount: 2 },
 ];
 
 const marketGoods = ["ferrite", "cobalt", "salvage", "algae", "rations", "circuits", "plating", "powerCell", "data", "medicine", "fuelRod"];
@@ -286,6 +294,11 @@ function missionReady(state: GameState, id: string) {
     case "corsair-accord": return state.contractsCompleted.length >= 10 && state.skills.diplomacy.level >= 25;
     case "rift-cartographer": return state.skills.astrogation.level >= 45 && state.completedExpeditions >= 6;
     case "silent-witness": return state.collection.length >= 55 && (state.combat.victories["boss-rift-leviathan"] ?? 0) >= 1;
+    case "erebus-oath": return state.contractsCompleted.length >= 3 && state.skills.logistics.level >= 12;
+    case "helix-quarantine": return state.collection.includes("expedition-quarantine") && state.skills.medicine.level >= 18;
+    case "cinder-mercy": return state.collection.includes("expedition-distress") && Object.entries(state.combat.victories).filter(([id]) => id.includes("corsair")).reduce((total, [, count]) => total + count, 0) >= 25;
+    case "rift-probe-recovered": return state.collection.includes("expedition-probe") && state.skills.science.level >= 32;
+    case "silent-archive-protocol": return state.collection.includes("expedition-archive") && state.skills.archaeology.level >= 40;
     default: return false;
   }
 }
@@ -439,11 +452,12 @@ function completeExpedition(state: GameState) {
   return applyAchievements({
     ...state,
     inventory: addItems(state.inventory, expedition.reward),
+    skills: { ...state.skills, [expedition.skill]: { xp: state.skills[expedition.skill].xp + expedition.xp, level: levelFromXp(state.skills[expedition.skill].xp + expedition.xp) } },
     collection: Array.from(new Set([...state.collection, expedition.collection])),
     activeExpedition: null,
     completedExpeditions: state.completedExpeditions + 1,
     crewMorale: Math.min(100, state.crewMorale + 3),
-    storyLog: [`${expedition.name} completed successfully.`, ...state.storyLog].slice(0, 30),
+    storyLog: [`${expedition.name} completed successfully. +${expedition.xp} ${skillMeta[expedition.skill].name} XP.`, ...state.storyLog].slice(0, 30),
     lastActiveAt: Date.now(),
   });
 }
@@ -797,6 +811,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     if (!event || !choice) return current;
     const { credits = 0, ...reward } = choice.reward;
     const factions = choice.faction ? { ...current.factions, [choice.faction.id]: Math.min(100, (current.factions[choice.faction.id] ?? 0) + choice.faction.reputation) } : current.factions;
+    const skills = choice.xp ? { ...current.skills, [choice.xp.skill]: { xp: current.skills[choice.xp.skill].xp + choice.xp.amount, level: levelFromXp(current.skills[choice.xp.skill].xp + choice.xp.amount) } } : current.skills;
     return {
       ...current,
       credits: current.credits + credits,
@@ -804,6 +819,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
       crewMorale: Math.max(0, Math.min(100, current.crewMorale + choice.morale)),
       commandPoints: current.commandPoints + (choice.commandPoints ?? 0),
       factions,
+      skills,
       pendingEvent: null,
       storyLog: [choice.result, ...current.storyLog].slice(0, 30),
       lastActiveAt: Date.now(),
@@ -886,7 +902,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
           {SKILL_IDS.map((id) => {
             const Icon = skillIcons[id];
             const isCombat = id === "combat";
-            return <button key={id} className={`skill-button ${isCombat ? (view === "combat" ? "selected" : "") : (view === "skills" && selectedSkill === id ? "selected" : "")}`} onClick={() => isCombat ? openView("combat") : (setSelectedSkill(id), setView("skills"))}><span className="skill-icon"><Icon /></span><span><strong>{skillMeta[id].name}</strong><small>{isCombat ? "Combat console" : skillMeta[id].group}</small></span><b>{state.skills[id].level}</b>{active.skillId === id ? <i className="active-pip" /> : null}</button>;
+            return <button key={id} className={`skill-button ${isCombat ? (view === "combat" ? "selected" : "") : (view === "skills" && selectedSkill === id ? "selected" : "")}`} onClick={() => isCombat ? openView("combat") : (setSelectedSkill(id), setView("skills"))}><span className="skill-icon"><Icon /></span><span><strong>{skillMeta[id].name}</strong><small>{isCombat ? "Combat console" : skillMeta[id].group}</small></span><b>{state.skills[id].level}</b>{isCombat ? state.combat.activeTaskId ? <i className="active-pip" aria-label="Combat engaged" /> : null : active.skillId === id ? <i className="active-pip" aria-label="Skill training active" /> : null}</button>;
           })}
         </div>
         <button className="home-button bank-link" onClick={() => openView("bank")}><Boxes /><span><strong>Cargo Bank</strong><small>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} items</small></span></button>
@@ -895,14 +911,14 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
       <main className="play-column">
         {offlineReport ? <div className="offline-report panel"><Cloud /><div><strong>Offline patrol report · {duration(offlineReport.seconds)}</strong><span>{offlineReport.activity} · {offlineReport.actions} actions · +{offlineReport.xp} XP · {itemsText(offlineReport.gains)}</span></div><button onClick={() => setOfflineReport(null)}>×</button></div> : null}
         {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
-        <section className="active-operation panel">
+        {view === "skills" ? <section className="active-operation panel">
           <div className="operation-mark"><CircleGauge /></div>
           <div className="operation-body">
             <div className="operation-heading"><div><p className="eyebrow">ACTIVE · {skillMeta[active.skillId].name.toUpperCase()} · {activeSector.name.toUpperCase()}</p><h2>{active.name}</h2></div><span className="level-chip">LV {activeSkill.level}</span></div>
             <Progress value={activeBlocked ? 0 : state.progress} className="operation-progress" />
             <div className="operation-meta"><span>{activeBlocked ? `Paused — ${activePauseReasons.join(" · ")}` : `${Math.floor(state.progress)}% · ${actionSeconds(state, active).toFixed(1)}s action`}</span><span>{active.xp} XP · {itemsText(active.produces)}</span></div>
           </div>
-        </section>
+        </section> : null}
 
         <header className="content-heading v3-heading"><div><p className="eyebrow">{view === "skills" ? skillMeta[selectedSkill].group.toUpperCase() + " SKILL" : "COMMAND CONSOLE"}</p><h1>{viewTitle[view][0]}</h1><p>{viewTitle[view][1]}</p></div>{view === "skills" ? <div className="xp-block"><strong>Level {state.skills[selectedSkill].level}</strong><span>{fmt(state.skills[selectedSkill].xp)} XP · {fmt(state.mastery[selectedSkill])} mastery</span><Progress value={xpProgress} /></div> : null}</header>
 
@@ -965,7 +981,14 @@ function SkillView({ state, skillId, activeId, onStart }: { state: GameState; sk
 }
 
 function Bank({ state }: { state: GameState }) {
-  return <div className="bank expanded panel"><div className="panel-heading"><div><p className="eyebrow">CARGO MANIFEST</p><h2>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} stored items</h2></div><PackageOpen /></div><div className="bank-grid">{Object.entries(state.inventory).map(([id, amount]) => { const Icon = itemIcons[id] ?? Boxes; return <div key={id} className="bank-item"><span><Icon /></span><div><small>{itemNames[id] ?? id}</small><strong>{fmt(amount)}</strong></div></div>; })}</div></div>;
+  const sections = [
+    ["Raw materials", ["ferrite", "cobalt", "iridium", "titanium", "phaseCrystal", "darkMatter", "quantumDust", "neutronium"]],
+    ["Components & fabrication", ["salvage", "circuits", "plating", "powerCell", "droneParts", "titaniumPlate", "quantumAlloy", "quantumCircuit", "neutroniumPlate", "quantumParts", "singularityCore"]],
+    ["Supplies & biological", ["algae", "rations", "medicine", "catalyst", "xenoFiber", "neuralGel", "genesisCompound"]],
+    ["Data & discoveries", ["data", "navData", "relic", "artefact", "voidData", "ancientCore", "commandToken"]],
+    ["Combat stores & unique gear", ["missiles", "fuelRod", "gearPhaseLance", "gearLivingBulwark", "gearChronoDrive", "gearFoundryHeart", "gearStarfallCrown"]],
+  ] as const;
+  return <div className="bank expanded panel"><div className="panel-heading"><div><p className="eyebrow">CARGO MANIFEST</p><h2>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} stored items</h2></div><PackageOpen /></div><div className="cargo-sections">{sections.map(([title, ids]) => <section key={title}><div className="collection-title"><h2>{title}</h2><span>{ids.reduce((total, id) => total + (state.inventory[id] ?? 0), 0)} units</span></div><div className="bank-grid">{ids.filter((id) => id in state.inventory).map((id) => { const Icon = itemIcons[id] ?? Boxes; return <div key={id} className="bank-item"><span><Icon /></span><div><small>{itemNames[id] ?? id}</small><strong>{fmt(state.inventory[id] ?? 0)}</strong></div></div>; })}</div></section>)}</div></div>;
 }
 
 function SectorView({ state, onTravel }: { state: GameState; onTravel: (id: string) => void }) {
@@ -1093,7 +1116,7 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
 
 function ExpeditionView({ state, now, onLaunch }: { state: GameState; now: number; onLaunch: (id: string) => void }) {
   const active = expeditions.find((entry) => entry.id === state.activeExpedition?.id);
-  return <><div className="expedition-status panel">{active ? <><Compass /><div><p className="eyebrow">TEAM DEPLOYED</p><h2>{active.name}</h2><span>Returns in {duration(((state.activeExpedition?.endsAt ?? now) - now) / 1000)}</span></div></> : <><Compass /><div><p className="eyebrow">EXPEDITION BAY</p><h2>Team ready</h2><span>Every launch requirement is listed below.</span></div></>}</div><div className="module-grid">{expeditions.map((entry) => { const missing: string[] = []; if (totalLevel(state) < entry.level) missing.push(`Total level ${entry.level} (${totalLevel(state)} / ${entry.level})`); Object.entries(entry.cost).forEach(([id, amount]) => { const held = state.inventory[id] ?? 0; if (held < amount) missing.push(`${amount - held} more ${itemNames[id] ?? id}`); }); if (entry.vehicle && !state.vehicles[entry.vehicle]) missing.push(`Build a ${vehicleSpecs[entry.vehicle].name}`); if (state.activeExpedition) missing.unshift("Away team already deployed"); const ready = missing.length === 0; return <article key={entry.id} className="module-card panel"><span><Landmark /></span><div><p className="eyebrow">{entry.minutes} MIN · TL {entry.level}</p><h3>{entry.name}</h3><p>{entry.description}</p><small>Cost: {itemsText(entry.cost)} · Reward: {itemsText(entry.reward)}{entry.vehicle ? ` · Requires ${vehicleSpecs[entry.vehicle].name}` : ""}</small><em className={ready ? "ready-cost" : "missing-cost"}>{ready ? "Launch requirements met" : `Missing: ${missing.join(" · ")}`}</em></div><Button disabled={!ready} onClick={() => onLaunch(entry.id)}>{ready ? "Launch" : "Requirements unmet"}</Button></article>; })}</div></>;
+  return <><div className="expedition-status panel">{active ? <><Compass /><div><p className="eyebrow">TEAM DEPLOYED</p><h2>{active.name}</h2><span>Returns in {duration(((state.activeExpedition?.endsAt ?? now) - now) / 1000)}</span></div></> : <><Compass /><div><p className="eyebrow">EXPEDITION BAY</p><h2>Team ready</h2><span>Every launch requirement is listed below.</span></div></>}</div><div className="module-grid">{expeditions.map((entry) => { const missing: string[] = []; if (totalLevel(state) < entry.level) missing.push(`Total level ${entry.level} (${totalLevel(state)} / ${entry.level})`); Object.entries(entry.cost).forEach(([id, amount]) => { const held = state.inventory[id] ?? 0; if (held < amount) missing.push(`${amount - held} more ${itemNames[id] ?? id}`); }); if (entry.vehicle && !state.vehicles[entry.vehicle]) missing.push(`Build a ${vehicleSpecs[entry.vehicle].name}`); if (state.activeExpedition) missing.unshift("Away team already deployed"); const ready = missing.length === 0; return <article key={entry.id} className="module-card panel"><span><Landmark /></span><div><p className="eyebrow">{entry.minutes} MIN · TL {entry.level}</p><h3>{entry.name}</h3><p>{entry.description}</p><small>Cost: {itemsText(entry.cost)} · Reward: {itemsText(entry.reward)} · +{fmt(entry.xp)} {skillMeta[entry.skill].name} XP{entry.vehicle ? ` · Requires ${vehicleSpecs[entry.vehicle].name}` : ""}</small><em className={ready ? "ready-cost" : "missing-cost"}>{ready ? "Launch requirements met" : `Missing: ${missing.join(" · ")}`}</em></div><Button disabled={!ready} onClick={() => onLaunch(entry.id)}>{ready ? "Launch" : "Requirements unmet"}</Button></article>; })}</div></>;
 }
 
 function CompletedArchive({ title, count, children }: { title: string; count: number; children: ReactNode }) {
@@ -1101,9 +1124,9 @@ function CompletedArchive({ title, count, children }: { title: string; count: nu
 }
 
 function DirectiveView({ state, onCompleteContract, onAlly, onClaimObjective, onClaimMission }: { state: GameState; onCompleteContract: (id: string) => void; onAlly: (id: string) => void; onClaimObjective: (id: string) => void; onClaimMission: (id: string) => void }) {
-  const openContracts = contracts.filter((entry) => !state.contractsCompleted.includes(entry.id));
-  const openObjectives = objectives.filter((entry) => !state.claimedObjectives.includes(entry.id));
-  const openMissions = missionDefinitions.filter((entry) => !state.missionsCompleted.includes(entry.id));
+  const openContracts = contracts.filter((entry) => !state.contractsCompleted.includes(entry.id)).sort((a, b) => Number(canAfford(state, b.cost)) - Number(canAfford(state, a.cost)));
+  const openObjectives = objectives.filter((entry) => !state.claimedObjectives.includes(entry.id)).sort((a, b) => Number(b.met(state)) - Number(a.met(state)));
+  const openMissions = missionDefinitions.filter((entry) => !state.missionsCompleted.includes(entry.id)).sort((a, b) => Number(missionReady(state, b.id)) - Number(missionReady(state, a.id)));
   return <div className="directive-board">
     <section className="directive-overview panel"><div><p className="eyebrow">PATROL MISSION CONTROL</p><h2>One board for every active goal.</h2><p>Contracts fund the cruiser and earn faction standing. Objectives mark patrol milestones. Missions are the long-form story across the five sectors.</p></div><div className="directive-counts"><span><strong>{openContracts.length}</strong> contracts</span><span><strong>{openObjectives.length}</strong> objectives</span><span><strong>{openMissions.length}</strong> missions</span></div></section>
     <section className="directive-section"><div className="section-label"><p className="eyebrow">FACTION WORK</p><h2>Contracts</h2></div><div className="faction-strip">{Object.entries(state.factions).map(([id, rep]) => <div key={id} className={`panel ${state.factionAlly === id ? "allied" : ""}`}><small>{factionNames[id]}</small><strong>{rep}</strong><Progress value={rep} /><Button variant="outline" disabled={Boolean(state.factionAlly) || rep < 30} onClick={() => onAlly(id)}>{state.factionAlly === id ? "Allied" : rep < 30 ? "30 rep required" : "Form alliance"}</Button></div>)}</div>{state.factionAlly ? <div className="notice panel">Alliance active with {factionNames[state.factionAlly]}. Their contracts award 20% more credits.</div> : null}<div className="module-grid">{openContracts.map((contract) => { const affordable = canAfford(state, contract.cost); const missing = Object.entries(contract.cost).filter(([id, amount]) => (state.inventory[id] ?? 0) < amount).map(([id, amount]) => `${amount - (state.inventory[id] ?? 0)} ${itemNames[id] ?? id}`); const reputation = Math.floor(contract.reward.reputation * (state.researchUnlocked.includes("broker-network") ? 1.25 : 1)); return <article key={contract.id} className="module-card panel"><span><ScrollText /></span><div><p className="eyebrow">{factionNames[contract.faction]}</p><h3>{contract.name}</h3><p>{contract.description}</p><small>Deliver: {itemsText(contract.cost)} · Reward: {Math.floor(contract.reward.credits * (state.factionAlly === contract.faction ? 1.2 : 1))} credits · +{reputation} reputation</small><em className={affordable ? "ready-cost" : "missing-cost"}>{affordable ? "Cargo verified — ready to fulfil" : `Need ${missing.join(" · ")}`}</em></div><Button disabled={!affordable} onClick={() => onCompleteContract(contract.id)}>{affordable ? "Fulfil contract" : "Cargo required"}</Button></article>; })}</div><CompletedArchive title="Fulfilled contracts" count={state.contractsCompleted.length}>{contracts.filter((entry) => state.contractsCompleted.includes(entry.id)).map((entry) => <span key={entry.id}>{entry.name} · {factionNames[entry.faction]}</span>)}</CompletedArchive></section>

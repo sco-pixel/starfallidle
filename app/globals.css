@@ -315,6 +315,9 @@ h3 { font-size: 1rem; }
 .bank.expanded .bank-grid { grid-template-columns: repeat(5, 1fr); }
 .bank.expanded .bank-item:nth-child(even) { border-right: 1px solid #202c39; }
 .bank.expanded .bank-item:nth-child(5n) { border-right: 0; }
+.cargo-sections { display: grid; gap: 16px; }
+.cargo-sections > section { border-top: 1px solid #283746; }
+.cargo-sections .collection-title { padding: 12px 10px 8px; }
 .bank.expanded .bank-item { min-height: 82px; justify-content: center; }
 .bank.expanded .bank-item small { max-width: 100px; }
 .patrol-card { padding: 14px; }
