@@ -27,6 +27,6 @@ export default function Home() {
 
     <section className="home-final panel"><div><p className="eyebrow">READY FOR COMMISSION</p><h2>Build a patrol record worth putting on the Hiscores.</h2><p>Play immediately as a local patrol, then use ChatGPT sign-in when you are ready to protect your commander, cloud save and ranking.</p></div><a className="home-primary-action" href="/play">Enter the bridge <ArrowRight /></a></section>
 
-    <footer className="home-footer"><span><ShieldCheck /> Cloud saves available with ChatGPT sign-in</span><a href="/play">Play Starfall Idle</a></footer>
+    <footer className="home-footer"><span><ShieldCheck /> Cloud saves available with ChatGPT sign-in</span><div><a href="https://ko-fi.com/w644769" target="_blank" rel="noreferrer">Support Starfall Idle on Ko-fi</a><a href="/play">Play Starfall Idle</a></div></footer>
   </main>;
 }

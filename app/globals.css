@@ -84,6 +84,9 @@ h3 { font-size: 1rem; }
   min-height: 40px; padding: 0 14px; border: 1px solid #3a495b; display: inline-flex; align-items: center;
   justify-content: center; color: #dbe4ed; text-decoration: none; font-size: .875rem; font-weight: 750; white-space: nowrap;
 }
+.support-link { min-height: 40px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; color: #e8ba62; text-decoration: none; font-size: .78rem; font-weight: 750; white-space: nowrap; }
+.support-link svg { width: 15px; }
+.support-link:hover, .support-link:focus-visible { color: #ffe09a; }
 .account-link { gap: 7px; background: #111a24; cursor: pointer; }
 .account-link svg { width: 17px; }
 .header-save-indicator { width: 32px; height: 32px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid #3a495b; color: #71b99f; background: #0d151d; }
@@ -144,6 +147,8 @@ h3 { font-size: 1rem; }
 .home-footer span { display: flex; align-items: center; gap: 7px; }
 .home-footer svg { width: 15px; color: #6cb797; }
 .home-footer a { color: #b6c2ca; text-decoration: none; }
+.home-footer > div { display: flex; gap: 16px; }
+.home-footer a:first-child { color: #d9ad58; }
 
 @media (max-width: 760px) {
   .starfall-home { padding-inline: 18px; }
@@ -158,6 +163,7 @@ h3 { font-size: 1rem; }
   .home-sector-section { grid-template-columns: 1fr; gap: 28px; }
   .home-final { align-items: flex-start; flex-direction: column; }
   .home-footer { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .home-footer > div { flex-wrap: wrap; gap: 10px 14px; }
 }
 
 .power-panel { margin-bottom: 12px; overflow: hidden; border-color: #3b4c5e; }
@@ -372,6 +378,7 @@ h3 { font-size: 1rem; }
   .brand-lockup .eyebrow { display: none; }
   h1 { font-size: .98rem; }
   .account-link, .sign-in-link { min-height: 38px; padding: 0 10px; font-size: .76rem; white-space: normal; text-align: center; line-height: 1.15; }
+  .support-link { display: none; }
   .game-layout { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
   .command-nav, .status-column { position: static; width: 100%; }
   .command-nav { order: 1; }

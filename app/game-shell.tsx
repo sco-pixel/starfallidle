@@ -874,6 +874,7 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
         </a>
         <div className="account-area">
           <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
+          <a className="support-link" href="https://ko-fi.com/w644769" target="_blank" rel="noreferrer"><Coins /> Support</a>
           {signedIn
             ? <><span className={`header-save-indicator ${saveStatus}`} role="status" aria-label={saveLabel} title={saveLabel}>{saveStatus === "saved" ? <ShieldCheck /> : <Cloud />}</span><button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button></>
             : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
