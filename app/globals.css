@@ -554,8 +554,8 @@ h3 { font-size: 1rem; }
 .combat-target.available { border-left-color: #4d8d78; }
 .combat-target.unavailable { opacity: .78; }
 .combat-roster-heading { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; }
-.combat-roster-heading p, .combat-roster-heading h2 { grid-column: 1; }
-.combat-roster-heading span { grid-column: 2; grid-row: 1 / 3; max-width: 230px; color: #80909e; font: .65rem var(--font-mono); text-align: right; }
+.combat-roster-heading > div { display: grid; gap: 3px; }
+.combat-roster-heading > div span { max-width: 340px; color: #80909e; font: .65rem var(--font-mono); }
 .target-head { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; }
 .target-head > span { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #47586b; color: #d6a84e; }
 .target-head svg { width: 17px; }
@@ -684,6 +684,8 @@ h3 { font-size: 1rem; }
 .market-toolbar strong { color: #cbd5dd; font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; }
 .market-size-buttons { display: flex; gap: 5px; }
 .market-size-buttons button { min-width: 35px; height: 31px; padding: 0 8px; border-radius: 0; font: 700 .72rem var(--font-mono); }
+.target-sector-toggle { display: flex; align-items: center; gap: 7px; color: #aab8c3; font-size: .78rem; white-space: nowrap; }
+.target-sector-toggle input { width: 15px; height: 15px; accent-color: #d6a84e; }
 .market-toolbar p { margin: 0; display: flex; align-items: center; gap: 7px; color: #8293a1; font-size: .75rem; }
 .market-toolbar p svg { width: 16px; color: #cc9d47; }
 .market-toolbar p b { color: #d8b15c; }
@@ -732,6 +734,14 @@ h3 { font-size: 1rem; }
 .settings-panel form > label { color: #c8d1d9; font-size: .78rem; font-weight: 700; }
 .settings-panel form > div { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .settings-panel form small { color: #71808f; font: .68rem var(--font-mono); }
+.skill-profile { align-items: start; }
+.profile-skill-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.profile-skill-grid article { display: flex; align-items: flex-start; gap: 9px; padding: 10px; border: 1px solid #2b3948; background: #101923; }
+.profile-skill-grid article > span { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; color: #e0af51; background: #e0af5112; }
+.profile-skill-grid article > span svg { width: 17px; }
+.profile-skill-grid article > div { display: grid; flex: 1; gap: 4px; }
+.profile-skill-grid strong { color: #dce5ec; font-size: .82rem; }
+.profile-skill-grid small { color: #8191a0; font: .66rem var(--font-mono); }
 .account-settings { grid-template-columns: 1fr auto; }
 .sign-out-link { min-height: 40px; padding: 0 16px; border: 1px solid #743d3d; display: inline-flex; align-items: center; justify-content: center; color: #f09494; text-decoration: none; font-size: .82rem; font-weight: 750; }
 .sign-out-link:hover, .sign-out-link:focus-visible { border-color: #ed6868; background: #ed686810; }
@@ -880,7 +890,8 @@ h3 { font-size: 1rem; }
   .combat-summary { grid-template-columns: 1fr; }
   .combat-operation, .combat-control, .combat-targets, .combat-milestones { grid-template-columns: 1fr; }
   .combat-roster-heading { grid-template-columns: 1fr; }
-  .combat-roster-heading span { grid-column: 1; grid-row: auto; max-width: none; text-align: left; }
+  .combat-roster-heading > div span { max-width: none; text-align: left; }
+  .target-sector-toggle { white-space: normal; }
   .combat-control .retreat-control { grid-column: 1; }
   .target-stats { grid-template-columns: repeat(2, 1fr); }
   .faction-strip { grid-template-columns: repeat(2, 1fr); }

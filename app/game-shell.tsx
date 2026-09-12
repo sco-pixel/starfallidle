@@ -63,7 +63,6 @@ const itemIcons: Record<string, typeof Gem> = {
 const navigation: { group: string; items: { id: ViewId; label: string; icon: typeof Map }[] }[] = [
   { group: "Vessel", items: [
     { id: "ship", label: "Cruiser", icon: Rocket }, { id: "crew", label: "Crew", icon: Users },
-    { id: "combat", label: "Combat", icon: Crosshair },
   ] },
   { group: "Galaxy", items: [
     { id: "sectors", label: "Star Chart", icon: Map }, { id: "expeditions", label: "Expeditions", icon: Compass },
@@ -297,8 +296,6 @@ function applyAchievements(state: GameState) {
 function completeActions(state: GameState, activity: SkillActivity, requested: number) {
   if (state.skills[activity.skillId].level < activity.level) return { state, count: 0 };
   let count = Math.max(0, Math.floor(requested));
-  const queuedBatch = activity.skillId !== "combat" && state.productionQueue[0]?.activityId === activity.id ? state.productionQueue[0] : null;
-  if (queuedBatch) count = Math.min(count, queuedBatch.remaining);
   const costs = activityCosts(state, activity);
   for (const [id, amount] of Object.entries(costs)) count = Math.min(count, Math.floor((state.inventory[id] ?? 0) / amount));
   const damage = combatDamage(state, activity);
@@ -363,16 +360,6 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
     crewXp[id] = (crewXp[id] ?? 0) + crewGain;
     crewLoyalty[id] = Math.min(100, (crewLoyalty[id] ?? 50) + Math.floor(crewGain / 100));
   });
-  let productionQueue = state.productionQueue;
-  let activeTask = state.activeTask;
-  if (queuedBatch) {
-    const remaining = queuedBatch.remaining - count;
-    productionQueue = remaining > 0 ? [{ ...queuedBatch, remaining }, ...state.productionQueue.slice(1)] : state.productionQueue.slice(1);
-    if (remaining <= 0 && productionQueue[0]) {
-      const nextActivity = activityById[productionQueue[0].activityId];
-      if (nextActivity && nextActivity.skillId !== "combat") activeTask = { skillId: nextActivity.skillId, activityId: nextActivity.id };
-    }
-  }
   let storyLog = state.storyLog;
   if (activity.enemy?.class.includes("Boss") && (state.combat.victories[activity.id] ?? 0) === 0) storyLog = [`Boss defeated: ${activity.name}.`, ...storyLog].slice(0, 100);
   if (previousOperationMastery < 100 && operationMastery >= 100) storyLog = [`Mastered operation: ${activity.name}.`, ...storyLog].slice(0, 100);
@@ -395,8 +382,6 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
     statusEffects,
     crewXp,
     crewLoyalty,
-    productionQueue,
-    activeTask,
     crewMorale: morale,
     factions,
     pendingEvent: nextEvent,
@@ -412,25 +397,18 @@ function applyOffline(state: GameState) {
   const beforeXp = Object.values(state.skills).reduce((sum, skill) => sum + skill.xp, 0);
   const firstActivity = activityById[state.activeTask.activityId] ?? activities[0];
   let next = state;
-  let remainingSeconds = elapsed;
+  const remainingSeconds = elapsed;
   let skillActions = 0;
-  const offlineActivities: string[] = [];
-  for (let batch = 0; batch < 9; batch += 1) {
-    const activity = activityById[next.activeTask.activityId] ?? activities[0];
-    if (!offlineActivities.includes(activity.name)) offlineActivities.push(activity.name);
-    const seconds = actionSeconds(next, activity);
-    const available = remainingSeconds + next.progress / 100 * seconds;
-    const requested = Math.floor(available / seconds);
-    if (!requested) { next = { ...next, progress: Math.min(99.9, available / seconds * 100) }; break; }
-    const previousId = activity.id;
+  const activity = activityById[next.activeTask.activityId] ?? activities[0];
+  const seconds = actionSeconds(next, activity);
+  const available = remainingSeconds + next.progress / 100 * seconds;
+  const requested = Math.floor(available / seconds);
+  if (!requested) next = { ...next, progress: Math.min(99.9, available / seconds * 100) };
+  else {
     const result = completeActions(next, activity, requested);
-    skillActions += result.count;
+    skillActions = result.count;
     const leftover = Math.max(0, available - result.count * seconds);
-    const advancedQueue = result.state.activeTask.activityId !== previousId;
-    next = result.state;
-    if (advancedQueue) { next = { ...next, progress: 0 }; remainingSeconds = leftover; continue; }
-    next = { ...next, progress: result.count < requested ? 0 : Math.min(99.9, leftover / seconds * 100) };
-    break;
+    next = { ...result.state, progress: result.count < requested ? 0 : Math.min(99.9, leftover / seconds * 100) };
   }
   let combatActions = 0;
   const combatActivity = next.combat.activeTaskId ? activityById[next.combat.activeTaskId] : null;
@@ -448,8 +426,7 @@ function applyOffline(state: GameState) {
     if (gain > 0) gains[id] = gain;
   });
   const totalActions = skillActions + combatActions;
-  const skillLabel = offlineActivities.length > 1 ? `${offlineActivities[0]} + ${offlineActivities.length - 1} queued batches` : firstActivity.name;
-  const activityLabel = combatActions && combatActivity ? `${skillLabel} + ${combatActivity.name}` : skillLabel;
+  const activityLabel = combatActions && combatActivity ? `${firstActivity.name} + ${combatActivity.name}` : firstActivity.name;
   return {
     state: { ...next, lastActiveAt: Date.now() },
     report: elapsed >= 30 && totalActions ? { seconds: elapsed, actions: totalActions, activity: activityLabel, gains, xp: Object.values(next.skills).reduce((sum, skill) => sum + skill.xp, 0) - beforeXp } : null,
@@ -633,18 +610,9 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const startActivity = useCallback((activity: SkillActivity) => {
     const current = stateRef.current;
     if (activity.skillId === "combat" || current.skills[activity.skillId].level < activity.level || !activityAvailable(current, activity)) return;
-    updateState((entry) => ({ ...entry, activeTask: { skillId: activity.skillId, activityId: activity.id }, productionQueue: [], progress: 0, lastActiveAt: Date.now() }));
+    updateState((entry) => ({ ...entry, activeTask: { skillId: activity.skillId, activityId: activity.id }, progress: 0, lastActiveAt: Date.now() }));
     setSelectedSkill(activity.skillId);
     setView("skills");
-  }, [updateState]);
-
-  const queueActivity = useCallback((activity: SkillActivity) => {
-    const current = stateRef.current;
-    if (activity.skillId === "combat" || current.skills[activity.skillId].level < activity.level || !activityAvailable(current, activity) || current.productionQueue.length >= 8) return;
-    updateState((entry) => {
-      const wasEmpty = entry.productionQueue.length === 0;
-      return { ...entry, productionQueue: [...entry.productionQueue, { activityId: activity.id, remaining: 25 }], ...(wasEmpty ? { activeTask: { skillId: activity.skillId, activityId: activity.id }, progress: 0 } : {}), lastActiveAt: Date.now() };
-    });
   }, [updateState]);
 
   const startCombat = useCallback((activity: SkillActivity) => {
@@ -753,9 +721,6 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   });
 
   const equipUniqueGear = (id: string) => updateState((current) => (current.inventory[id] ?? 0) > 0 ? { ...current, equippedGear: id, lastActiveAt: Date.now() } : current);
-
-  const saveLoadout = (slot: "alpha" | "beta") => updateState((current) => ({ ...current, combatLoadouts: { ...current.combatLoadouts, [slot]: { weapon: current.combat.weapon, stance: current.combat.stance, retreatAt: current.retreatAt } }, lastActiveAt: Date.now() }));
-  const applyLoadout = (slot: "alpha" | "beta") => updateState((current) => { const loadout = current.combatLoadouts[slot]; return { ...current, combat: { ...current.combat, weapon: loadout.weapon, stance: loadout.stance }, retreatAt: loadout.retreatAt, lastActiveAt: Date.now() }; });
 
   const clearStatusEffect = (effect: StatusEffect) => updateState((current) => {
     const costs: Record<StatusEffect, Record<string, number>> = { radiation: { medicine: 2 }, hullBreach: { salvage: 5 }, sensorDisruption: { data: 5 }, overheating: { powerCell: 2 } };
@@ -941,12 +906,12 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
 
         <header className="content-heading v3-heading"><div><p className="eyebrow">{view === "skills" ? skillMeta[selectedSkill].group.toUpperCase() + " SKILL" : "COMMAND CONSOLE"}</p><h1>{viewTitle[view][0]}</h1><p>{viewTitle[view][1]}</p></div>{view === "skills" ? <div className="xp-block"><strong>Level {state.skills[selectedSkill].level}</strong><span>{fmt(state.skills[selectedSkill].xp)} XP · {fmt(state.mastery[selectedSkill])} mastery</span><Progress value={xpProgress} /></div> : null}</header>
 
-        {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} onQueue={queueActivity} onClearQueue={() => updateState((current) => ({ ...current, productionQueue: [] }))} /> : null}
+        {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
         {view === "sectors" ? <SectorView state={state} onTravel={travel} /> : null}
-        {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
+        {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onUpgradeEquipment={upgradeEquipment} onEquip={equipUniqueGear} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
         {view === "crew" ? <CrewView state={state} onAssign={assignCrew} /> : null}
-        {view === "combat" ? <CombatView state={state} onUpgrade={upgradeEquipment} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={() => startActivity(activityById["hull-repair"])} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onEquip={equipUniqueGear} onSaveLoadout={saveLoadout} onApplyLoadout={applyLoadout} onClearEffect={clearStatusEffect} /> : null}
+        {view === "combat" ? <CombatView state={state} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={() => startActivity(activityById["hull-repair"])} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onClearEffect={clearStatusEffect} /> : null}
         {view === "expeditions" ? <ExpeditionView state={state} now={now} onLaunch={launchExpedition} /> : null}
         {view === "directives" ? <DirectiveView state={state} onCompleteContract={completeContract} onAlly={formAlliance} onClaimObjective={claimObjective} onClaimMission={claimMission} /> : null}
         {view === "research" ? <ResearchView state={state} onUnlock={unlockResearch} onChoosePath={chooseResearchPath} /> : null}
@@ -987,16 +952,16 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   );
 }
 
-function SkillView({ state, skillId, activeId, onStart, onQueue, onClearQueue }: { state: GameState; skillId: SkillId; activeId: string; onStart: (activity: SkillActivity) => void; onQueue: (activity: SkillActivity) => void; onClearQueue: () => void }) {
-  return <><section className="production-queue panel"><div><p className="eyebrow">OFFLINE PRODUCTION QUEUE</p><h2>{state.productionQueue.length ? `${state.productionQueue.length} batches scheduled` : "No queued batches"}</h2><p>Each queued batch runs 25 operations in order.</p></div><div>{state.productionQueue.map((entry, index) => <span key={`${entry.activityId}-${index}`}>{activityById[entry.activityId]?.name ?? "Unknown"} · {entry.remaining}</span>)}</div>{state.productionQueue.length ? <Button variant="outline" onClick={onClearQueue}>Clear queue</Button> : null}</section><div className="activity-list">{activities.filter((entry) => entry.skillId === skillId).sort((a, b) => a.level - b.level).map((activity) => {
+function SkillView({ state, skillId, activeId, onStart }: { state: GameState; skillId: SkillId; activeId: string; onStart: (activity: SkillActivity) => void }) {
+  return <div className="activity-list">{activities.filter((entry) => entry.skillId === skillId).sort((a, b) => a.level - b.level).map((activity) => {
     const locked = state.skills[skillId].level < activity.level;
     const wrongSector = !activityAvailable(state, activity);
     const destinations = (activity.sectors ?? []).map((id) => sectorById[id]?.name ?? id);
     const mastery = state.operationMastery[activity.id] ?? 0;
     const completions = state.operationCounts[activity.id] ?? 0;
     const nextMilestone = [10, 100, 250, 1000, 10000].find((value) => completions < value);
-    return <article key={activity.id} className={`activity-row panel ${activeId === activity.id ? "running" : ""}`}><span className="activity-level">{locked ? <LockKeyhole /> : <CircleGauge />}<b>LV {activity.level}</b></span><span className="activity-copy"><strong>{activity.name}</strong><small>{activity.description}</small><em>{activity.consumes ? `Uses: ${itemsText(activity.consumes)} · ` : ""}Yields: {itemsText(activity.produces)}{activity.credits ? ` · ${activity.credits} credits` : ""}</em><span className="mastery-line">Mastery {mastery}/100 · {fmt(completions)} completions{mastery >= 100 ? " · Master perk active" : ""}{nextMilestone ? ` · Next record ${fmt(nextMilestone)}` : " · Legendary record"}</span>{locked ? <i>Requires {skillMeta[skillId].name} level {activity.level}</i> : wrongSector ? <i>Travel to {listText(destinations)}</i> : null}</span><span className="activity-action"><b>{activity.seconds}s</b><small>{activity.xp} XP</small><div><Button size="sm" disabled={locked || wrongSector || activeId === activity.id} onClick={() => onStart(activity)}>{activeId === activity.id ? "Running" : "Start"}</Button><Button size="sm" variant="outline" disabled={locked || wrongSector || state.productionQueue.length >= 8} onClick={() => onQueue(activity)}>Queue 25</Button></div></span></article>;
-  })}</div></>;
+    return <article key={activity.id} className={`activity-row panel ${activeId === activity.id ? "running" : ""}`}><span className="activity-level">{locked ? <LockKeyhole /> : <CircleGauge />}<b>LV {activity.level}</b></span><span className="activity-copy"><strong>{activity.name}</strong><small>{activity.description}</small><em>{activity.consumes ? `Uses: ${itemsText(activity.consumes)} · ` : ""}Yields: {itemsText(activity.produces)}{activity.credits ? ` · ${activity.credits} credits` : ""}</em><span className="mastery-line">Mastery {mastery}/100 · {fmt(completions)} completions{mastery >= 100 ? " · Master perk active" : ""}{nextMilestone ? ` · Next record ${fmt(nextMilestone)}` : " · Legendary record"}</span>{locked ? <i>Requires {skillMeta[skillId].name} level {activity.level}</i> : wrongSector ? <i>Travel to {listText(destinations)}</i> : null}</span><span className="activity-action"><b>{activity.seconds}s</b><small>{activity.xp} XP</small><Button size="sm" disabled={locked || wrongSector || activeId === activity.id} onClick={() => onStart(activity)}>{activeId === activity.id ? "Running" : "Start"}</Button></span></article>;
+  })}</div>;
 }
 
 function Bank({ state }: { state: GameState }) {
@@ -1011,14 +976,25 @@ function SectorView({ state, onTravel }: { state: GameState; onTravel: (id: stri
   })}</div>;
 }
 
-function ShipView({ state, onUpgrade, onPowerMode, onBuildDrone, onBuildVehicle }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
+function ShipView({ state, onUpgrade, onUpgradeEquipment, onEquip, onPowerMode, onBuildDrone, onBuildVehicle }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onUpgradeEquipment: (id: EquipmentId) => void; onEquip: (id: string) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
   const modes: { id: PowerMode; name: string; effect: string }[] = [
     { id: "balanced", name: "Balanced", effect: "No system penalties or priority bonuses" }, { id: "industrial", name: "Industrial", effect: "12% faster Engineering, Metallurgy and Drones" },
     { id: "research", name: "Research", effect: "12% faster scientific and medical skills" }, { id: "combat", name: "Combat", effect: "12% faster vessel encounters" },
     { id: "navigation", name: "Navigation", effect: "12% faster Astrogation, Logistics and Diplomacy" },
   ];
   const activeMode = modes.find((mode) => mode.id === state.powerMode) ?? modes[0];
-  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>Deck modules</h2></div><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const affordable = state.credits >= level * 40 && canAfford(state, { plating: level * 3, circuits: level * 2 }); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{module.effect(level)}</small><small>{level * 40} credits · {level * 3} Plating · {level * 2} Circuits</small></div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} /></>;
+  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>Deck modules</h2></div><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const cost = { plating: level * 3, circuits: level * 2, credits: level * 40 }; const missing = moduleMissing(state, cost); const affordable = missing.length === 0; return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>{module.effect(level)}</small><small>{cost.credits} credits · {cost.plating} Plating · {cost.circuits} Circuits</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>{affordable ? "Upgrade" : "Requirements unmet"}</Button></article>; })}</div><ArmouryView state={state} onUpgrade={onUpgradeEquipment} onEquip={onEquip} /><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} /></>;
+}
+
+function moduleMissing(state: GameState, cost: Record<string, number>) {
+  return Object.entries(cost).flatMap(([id, amount]) => {
+    const held = id === "credits" ? state.credits : state.inventory[id] ?? 0;
+    return held < amount ? [`${amount - held} ${id === "credits" ? "credits" : itemNames[id] ?? id}`] : [];
+  });
+}
+
+function ArmouryView({ state, onUpgrade, onEquip }: { state: GameState; onUpgrade: (id: EquipmentId) => void; onEquip: (id: string) => void }) {
+  return <><div className="section-label"><p className="eyebrow">CRUISER ARMOURY</p><h2>Equipment upgrades</h2></div><div className="module-grid">{(Object.entries(equipmentSpecs) as [EquipmentId, typeof equipmentSpecs[EquipmentId]][]).map(([id, gear]) => { const cost = equipmentCosts[id](state.equipment[id]); const missing = moduleMissing(state, cost); return <article key={id} className="module-card panel"><span><Shield /></span><div><p className="eyebrow">MK {state.equipment[id]}</p><h3>{gear.name}</h3><p>{gear.description}</p><small>{itemsText(cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onUpgrade(id)}>{missing.length ? "Requirements unmet" : "Upgrade"}</Button></article>; })}</div><div className="section-label"><p className="eyebrow">BOSS SALVAGE</p><h2>Unique equipment</h2></div><div className="module-grid">{Object.entries(uniqueGear).map(([id, gear]) => { const owned = (state.inventory[id] ?? 0) > 0; return <article key={id} className={`module-card panel ${state.equippedGear === id ? "active" : ""}`}><span><Star /></span><div><p className="eyebrow">{owned ? "RECOVERED" : "BOSS DROP REQUIRED"}</p><h3>{gear.name}</h3><p>{gear.effect}</p>{!owned ? <em className="missing-cost">Defeat its sector boss to recover this gear.</em> : null}</div><Button disabled={!owned || state.equippedGear === id} onClick={() => onEquip(id)}>{state.equippedGear === id ? "Equipped" : owned ? "Equip" : "Not recovered"}</Button></article>; })}</div></>;
 }
 
 function crewLevel(xp: number) {
@@ -1053,11 +1029,13 @@ function CrewView({ state, onAssign }: { state: GameState; onAssign: (id: string
 }
 
 function DroneView({ state, onBuild, onBuildVehicle }: { state: GameState; onBuild: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
-  return <><div className="section-label"><p className="eyebrow">AUTONOMOUS CRAFT</p><h2>Drone Swarms</h2></div><div className="module-grid">{(Object.entries(droneSpecs) as [DroneId, typeof droneSpecs[DroneId]][]).map(([id, drone]) => <article key={id} className="module-card panel"><span><Bot /></span><div><p className="eyebrow">ACTIVE UNITS · {state.drones[id]}</p><h3>{drone.name}</h3><p>{drone.description}</p><small>{itemsText(drone.cost)}</small></div><Button disabled={!canAfford(state, drone.cost)} onClick={() => onBuild(id)}>Fabricate</Button></article>)}</div><div className="section-label"><p className="eyebrow">HANGAR VEHICLES</p><h2>Surface & Boarding Craft</h2></div><div className="module-grid">{(Object.entries(vehicleSpecs) as [VehicleId, typeof vehicleSpecs[VehicleId]][]).map(([id, vehicle]) => <article key={id} className="module-card panel"><span><Rocket /></span><div><p className="eyebrow">READY · {state.vehicles[id]}</p><h3>{vehicle.name}</h3><p>{vehicle.description}</p><small>{itemsText(vehicle.cost)}</small></div><Button disabled={!canAfford(state, vehicle.cost)} onClick={() => onBuildVehicle(id)}>Construct</Button></article>)}</div></>;
+  return <><div className="section-label"><p className="eyebrow">AUTONOMOUS CRAFT</p><h2>Drone Swarms</h2></div><div className="module-grid">{(Object.entries(droneSpecs) as [DroneId, typeof droneSpecs[DroneId]][]).map(([id, drone]) => { const missing = moduleMissing(state, drone.cost); return <article key={id} className="module-card panel"><span><Bot /></span><div><p className="eyebrow">ACTIVE UNITS · {state.drones[id]}</p><h3>{drone.name}</h3><p>{drone.description}</p><small>{itemsText(drone.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuild(id)}>{missing.length ? "Requirements unmet" : "Fabricate"}</Button></article>; })}</div><div className="section-label"><p className="eyebrow">HANGAR VEHICLES</p><h2>Surface & Boarding Craft</h2></div><div className="module-grid">{(Object.entries(vehicleSpecs) as [VehicleId, typeof vehicleSpecs[VehicleId]][]).map(([id, vehicle]) => { const missing = moduleMissing(state, vehicle.cost); return <article key={id} className="module-card panel"><span><Rocket /></span><div><p className="eyebrow">READY · {state.vehicles[id]}</p><h3>{vehicle.name}</h3><p>{vehicle.description}</p><small>{itemsText(vehicle.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuildVehicle(id)}>{missing.length ? "Requirements unmet" : "Construct"}</Button></article>; })}</div></>;
 }
 
-function CombatView({ state, onUpgrade, onRetreat, onRepair, onDoctrine, onEngage, onStop, onEquip, onSaveLoadout, onApplyLoadout, onClearEffect }: { state: GameState; onUpgrade: (id: EquipmentId) => void; onRetreat: (value: number) => void; onRepair: () => void; onDoctrine: (weapon?: CombatWeapon, stance?: CombatStance) => void; onEngage: (activity: SkillActivity) => void; onStop: () => void; onEquip: (id: string) => void; onSaveLoadout: (slot: "alpha" | "beta") => void; onApplyLoadout: (slot: "alpha" | "beta") => void; onClearEffect: (effect: StatusEffect) => void }) {
+function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, onClearEffect }: { state: GameState; onRetreat: (value: number) => void; onRepair: () => void; onDoctrine: (weapon?: CombatWeapon, stance?: CombatStance) => void; onEngage: (activity: SkillActivity) => void; onStop: () => void; onClearEffect: (effect: StatusEffect) => void }) {
+  const [sectorOnly, setSectorOnly] = useState(true);
   const targets = activities.filter((entry) => entry.skillId === "combat" && entry.enemy);
+  const visibleTargets = sectorOnly ? targets.filter((target) => !target.sectors?.length || target.sectors.includes(state.sectorId)) : targets;
   const activeCandidate = state.combat.activeTaskId ? activityById[state.combat.activeTaskId] : null;
   const activeTarget = activeCandidate?.skillId === "combat" ? activeCandidate : null;
   const combatPauseReasons = activeTarget ? operationPauseReasons(state, activeTarget) : [];
@@ -1089,10 +1067,9 @@ function CombatView({ state, onUpgrade, onRetreat, onRepair, onDoctrine, onEngag
       <label className="retreat-control"><span>Auto-retreat at {state.retreatAt}% hull</span><Slider value={[state.retreatAt]} min={10} max={75} step={5} onValueChange={(value) => onRetreat(value[0])} /></label>
       <Button onClick={onRepair}><Wrench /> Repair & reset streak</Button>
     </section>
-    <section className="depth-panel panel"><div><p className="eyebrow">TACTICAL LOADOUTS</p><h2>Doctrine presets</h2><p>Store weapon, stance and retreat settings for quick changes between targets.</p></div><div className="loadout-grid">{(["alpha", "beta"] as const).map((slot) => { const loadout = state.combatLoadouts[slot]; return <article key={slot}><strong>{slot.toUpperCase()}</strong><span>{weaponNames[loadout.weapon]} · {stanceNames[loadout.stance]} · retreat {loadout.retreatAt}%</span><div><Button variant="outline" onClick={() => onSaveLoadout(slot)}>Save current</Button><Button onClick={() => onApplyLoadout(slot)}>Apply</Button></div></article>; })}</div></section>
     {state.statusEffects.length ? <section className="depth-panel panel"><div><p className="eyebrow">SHIP CONDITIONS</p><h2>Persistent battle damage</h2><p>Conditions remain after combat until treated here or cleared by their related skill.</p></div><div className="effect-grid">{state.statusEffects.map((effect) => <article key={effect}><strong>{effect.replace(/([A-Z])/g, " $1")}</strong><span>{effect === "radiation" ? "Operations 5% slower · clear with 2 Medkits or Medicine" : effect === "hullBreach" ? "Incoming damage +18% · clear with 5 Salvage or Engineering" : effect === "sensorDisruption" ? "Combat accuracy −8% · clear with 5 Data or Science" : "Operations 10% slower · clear with 2 Power Cells or Metallurgy"}</span><Button variant="outline" onClick={() => onClearEffect(effect)}>Treat</Button></article>)}</div></section> : null}
-    <div className="section-label combat-roster-heading"><p className="eyebrow">HOSTILE CONTACTS</p><h2>Target roster</h2><span>Target cards always show the next actionable requirement.</span></div>
-    <div className="combat-targets">{[...targets].sort((a, b) => a.level - b.level).map((target) => {
+    <div className="section-label combat-roster-heading"><div><p className="eyebrow">HOSTILE CONTACTS</p><h2>Target roster</h2><span>Target cards always show the next actionable requirement.</span></div><label className="target-sector-toggle"><input type="checkbox" checked={sectorOnly} onChange={(event) => setSectorOnly(event.target.checked)} /> Show only enemies in this sector</label></div>
+    <div className="combat-targets">{[...visibleTargets].sort((a, b) => a.level - b.level).map((target) => {
       const enemy = target.enemy!;
       const unavailableReasons = operationPauseReasons(state, target);
       const available = unavailableReasons.length === 0;
@@ -1111,9 +1088,6 @@ function CombatView({ state, onUpgrade, onRetreat, onRepair, onDoctrine, onEngag
       </article>;
     })}</div>
     <div className="combat-milestones panel"><div><p className="eyebrow">COMBAT SPECIALISATION</p><h2>Rank perks</h2></div>{milestones.map(([level, name, effect]) => <div key={level} className={state.skills.combat.level >= level ? "unlocked" : ""}><span>LV {level}</span><strong>{name}</strong><small>{effect}</small></div>)}</div>
-    <div className="section-label"><p className="eyebrow">ARMOURY</p><h2>Equipment upgrades</h2></div>
-    <div className="module-grid">{(Object.entries(equipmentSpecs) as [EquipmentId, typeof equipmentSpecs[EquipmentId]][]).map(([id, gear]) => { const cost = equipmentCosts[id](state.equipment[id]); return <article key={id} className="module-card panel"><span><Shield /></span><div><p className="eyebrow">MK {state.equipment[id]}</p><h3>{gear.name}</h3><p>{gear.description}</p><small>{itemsText(cost)}</small></div><Button disabled={!canAfford(state, cost)} onClick={() => onUpgrade(id)}>Upgrade</Button></article>; })}</div>
-    <div className="section-label"><p className="eyebrow">BOSS SALVAGE</p><h2>Unique equipment</h2></div><div className="module-grid">{Object.entries(uniqueGear).map(([id, gear]) => { const owned = (state.inventory[id] ?? 0) > 0; return <article key={id} className={`module-card panel ${state.equippedGear === id ? "active" : ""}`}><span><Star /></span><div><p className="eyebrow">{owned ? "RECOVERED" : "UNKNOWN SIGNAL"}</p><h3>{gear.name}</h3><p>{gear.effect}</p></div><Button disabled={!owned || state.equippedGear === id} onClick={() => onEquip(id)}>{state.equippedGear === id ? "Equipped" : owned ? "Equip" : "Boss drop"}</Button></article>; })}</div>
   </>;
 }
 
@@ -1180,7 +1154,7 @@ function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: 
       <div><p className="eyebrow">DOCKED AT {sector.name.toUpperCase()}</p><h2>Station exchange</h2><p>Trade common supplies at the local station. Quotes refresh every five minutes; selling benefits from your cargo deck and Logistics training.</p></div>
       <div className="market-metrics"><span><Coins />{fmt(state.credits)}<small>credits</small></span><span><PackageOpen />{fmt(Object.values(state.inventory).reduce((total, amount) => total + amount, 0))}<small>cargo units</small></span><span><Activity />{Math.floor(nextRefresh / 60)}:{String(nextRefresh % 60).padStart(2, "0")}<small>next refresh</small></span></div>
     </section>
-    <section className="market-toolbar panel"><div><strong>Order size</strong><div className="market-size-buttons">{[1, 5, 10, 25].map((amount) => <Button key={amount} variant={orderSize === amount ? "default" : "outline"} onClick={() => setOrderSize(amount)}>{amount}</Button>)}</div></div><p><TrendingUp />Cargo and Logistics add <b>+{cargoBonus}%</b> to sell quotes.</p></section>
+    <section className="market-toolbar panel"><div><strong>Order size</strong><div className="market-size-buttons">{[50, 100, 150, 200, 250, 500, 1000].map((amount) => <Button key={amount} variant={orderSize === amount ? "default" : "outline"} onClick={() => setOrderSize(amount)}>{amount}</Button>)}</div></div><p><TrendingUp />Cargo and Logistics add <b>+{cargoBonus}%</b> to sell quotes.</p></section>
     <section className="market-table panel"><div className="market-table-head"><span>Commodity</span><span>Market quote</span><span>Trade</span></div>{marketGoods.map((id) => {
       const Icon = itemIcons[id];
       const buyPrice = getPrice(id, "buy");
@@ -1354,6 +1328,11 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
       <div className="character-emblem">{initials}</div>
       <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{signedIn ? "ChatGPT account · cloud save active" : "Guest profile · saved on this device"}</span></div>
       <div className="character-record"><span>Patrol <b>{state.patrol}</b></span><span>Total level <b>{totalLevel(state)}</b></span><span>Operations <b>{fmt(state.totalActions)}</b></span></div>
+    </section>
+
+    <section className="settings-panel skill-profile panel">
+      <div><p className="eyebrow">COMMANDER QUALIFICATIONS</p><h2>Skill record</h2><p>Training level and total experience across the Aethelgard&apos;s fourteen disciplines.</p></div>
+      <div className="profile-skill-grid">{SKILL_IDS.map((id) => { const skill = state.skills[id]; const start = xpForLevel(skill.level); const end = skill.level >= MAX_SKILL_LEVEL ? skill.xp : xpForLevel(skill.level + 1); const progress = skill.level >= MAX_SKILL_LEVEL ? 100 : (skill.xp - start) / Math.max(1, end - start) * 100; const Icon = skillIcons[id]; return <article key={id}><span><Icon /></span><div><strong>{skillMeta[id].name}</strong><small>Level {skill.level} · {fmt(skill.xp)} XP</small><Progress value={progress} /></div></article>; })}</div>
     </section>
 
     <section className="settings-panel panel">

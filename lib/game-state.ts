@@ -17,7 +17,6 @@ export type PowerMode = "balanced" | "industrial" | "research" | "combat" | "nav
 export type ResearchPath = "industrial" | "exploration" | "military" | "xenotechnology";
 export type StatusEffect = "radiation" | "hullBreach" | "sensorDisruption" | "overheating";
 export type OutpostType = "mining" | "research" | "trade";
-export type CombatLoadout = { weapon: CombatWeapon; stance: CombatStance; retreatAt: number };
 export type CombatState = {
   weapon: CombatWeapon;
   stance: CombatStance;
@@ -56,7 +55,6 @@ export type GameState = {
   vehicles: Record<VehicleId, number>;
   researchUnlocked: string[];
   researchPath: ResearchPath | null;
-  productionQueue: { activityId: string; remaining: number }[];
   collection: string[];
   factions: Record<string, number>;
   contractsCompleted: string[];
@@ -72,7 +70,6 @@ export type GameState = {
   shields: number;
   retreatAt: number;
   equippedGear: string | null;
-  combatLoadouts: Record<"alpha" | "beta", CombatLoadout>;
   statusEffects: StatusEffect[];
   combat: CombatState;
   storyLog: string[];
@@ -171,7 +168,6 @@ export function defaultGameState(): GameState {
     vehicles: { rover: 0, boardingShuttle: 0 },
     researchUnlocked: [],
     researchPath: null,
-    productionQueue: [],
     collection: [],
     factions: { patrol: 0, prospectors: 0, institute: 0, frontier: 0, corsairs: 0 },
     contractsCompleted: [],
@@ -187,10 +183,6 @@ export function defaultGameState(): GameState {
     shields: 40,
     retreatAt: 25,
     equippedGear: null,
-    combatLoadouts: {
-      alpha: { weapon: "laser", stance: "balanced", retreatAt: 25 },
-      beta: { weapon: "railgun", stance: "defensive", retreatAt: 40 },
-    },
     statusEffects: [],
     combat: { weapon: "laser", stance: "balanced", activeTaskId: null, progress: 0, victories: {}, streak: 0, bestStreak: 0, lastLoot: null },
     storyLog: ["Patrol 01 commissioned at Erebus Station."],
@@ -232,7 +224,6 @@ export function sanitizeGameState(value: unknown): GameState {
   const victoriesInput = combatInput.victories && typeof combatInput.victories === "object" ? combatInput.victories as Record<string, unknown> : {};
   const saveVersion = boundedNumber(input.version, 0, 5);
   const outpostsInput = input.outposts && typeof input.outposts === "object" ? input.outposts as Record<string, unknown> : {};
-  const loadoutsInput = input.combatLoadouts && typeof input.combatLoadouts === "object" ? input.combatLoadouts as Record<string, unknown> : {};
 
   const skills = Object.fromEntries(SKILL_IDS.map((id) => {
     const raw = skillsInput[id] && typeof skillsInput[id] === "object" ? skillsInput[id] as Record<string, unknown> : {};
@@ -295,7 +286,6 @@ export function sanitizeGameState(value: unknown): GameState {
     vehicles: numericRecord(input.vehicles, defaults.vehicles, 20),
     researchUnlocked: stringList(input.researchUnlocked),
     researchPath: ["industrial", "exploration", "military", "xenotechnology"].includes(String(input.researchPath)) ? input.researchPath as ResearchPath : null,
-    productionQueue: Array.isArray(input.productionQueue) ? input.productionQueue.filter((entry) => entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).activityId === "string").slice(0, 8).map((entry) => ({ activityId: String((entry as Record<string, unknown>).activityId).slice(0, 80), remaining: Math.max(1, boundedNumber((entry as Record<string, unknown>).remaining, 25, 1000)) })) : [],
     collection: stringList(input.collection, 500),
     factions: numericRecord(input.factions, defaults.factions, 100),
     contractsCompleted: stringList(input.contractsCompleted, 500),
@@ -313,12 +303,6 @@ export function sanitizeGameState(value: unknown): GameState {
     shields: boundedNumber(input.shields, defaults.shields, 100_000),
     retreatAt: boundedNumber(input.retreatAt, defaults.retreatAt, 90),
     equippedGear: typeof input.equippedGear === "string" ? input.equippedGear.slice(0, 80) : null,
-    combatLoadouts: Object.fromEntries((["alpha", "beta"] as const).map((slot) => {
-      const raw = loadoutsInput[slot] && typeof loadoutsInput[slot] === "object" ? loadoutsInput[slot] as Record<string, unknown> : defaults.combatLoadouts[slot];
-      const weapon = ["laser", "railgun", "missile"].includes(String(raw.weapon)) ? raw.weapon as CombatWeapon : defaults.combatLoadouts[slot].weapon;
-      const stance = ["balanced", "aggressive", "defensive"].includes(String(raw.stance)) ? raw.stance as CombatStance : defaults.combatLoadouts[slot].stance;
-      return [slot, { weapon, stance, retreatAt: boundedNumber(raw.retreatAt, defaults.combatLoadouts[slot].retreatAt, 90) }];
-    })) as Record<"alpha" | "beta", CombatLoadout>,
     statusEffects: stringList(input.statusEffects, 4).filter((effect): effect is StatusEffect => ["radiation", "hullBreach", "sensorDisruption", "overheating"].includes(effect)),
     combat: {
       weapon: ["laser", "railgun", "missile"].includes(String(combatInput.weapon)) ? combatInput.weapon as CombatWeapon : "laser",
