@@ -220,6 +220,10 @@ export const researchNodes: { id: string; name: string; description: string; cos
   { id: "outpost-network", name: "Outpost Network", description: "Outpost bonuses apply throughout their sector.", cost: { quantumCircuit: 18, titaniumPlate: 10 }, requires: ["titanium-printing"] },
   { id: "singularity-theory", name: "Singularity Theory", description: "Unlock the highest tier of specialist operations.", cost: { voidData: 80, quantumDust: 30, ancientCore: 5 }, requires: ["boss-analysis", "outpost-network"] },
   { id: "starfall-doctrine", name: "Starfall Doctrine", description: "Command Points improve all output by one per five points.", cost: { singularityCore: 2, commandToken: 1 }, requires: ["singularity-theory"] },
+  { id: "recovery-protocols", name: "Recovery Protocols", description: "Medicine and Biochemistry actions complete 8% faster.", cost: { data: 36, medicine: 6 }, requires: ["xeno-adaptation"] },
+  { id: "broker-network", name: "Broker Network", description: "Faction contracts award 25% more reputation.", cost: { data: 38, navData: 6 }, requires: ["phase-mapping"] },
+  { id: "data-vaults", name: "Data Vaults", description: "Science and Archaeology operations gain +1 output.", cost: { relic: 6, circuits: 8 }, requires: ["sentinel-protocol"] },
+  { id: "mission-beacon", name: "Mission Beacon", description: "Mission credit rewards increase by 20%.", cost: { voidData: 20, commandToken: 1 }, requires: ["quantum-logistics"] },
 ];
 
 export const contracts: { id: string; faction: string; name: string; description: string; cost: Record<string, number>; reward: { credits: number; reputation: number } }[] = [
@@ -229,6 +233,12 @@ export const contracts: { id: string; faction: string; name: string; description
   { id: "patrol-refit", faction: "patrol", name: "Patrol Refit", description: "Supply structural materials to a damaged cutter.", cost: { plating: 6, circuits: 4 }, reward: { credits: 260, reputation: 10 } },
   { id: "quiet-passage", faction: "corsairs", name: "Quiet Passage", description: "Trade valuable salvage for intelligence.", cost: { salvage: 25, relic: 2 }, reward: { credits: 300, reputation: 7 } },
   { id: "rift-convoy", faction: "frontier", name: "Rift Convoy", description: "Prepare a long-range convoy package.", cost: { fuelRod: 3, rations: 10, medicine: 4 }, reward: { credits: 420, reputation: 12 } },
+  { id: "helix-sanitation", faction: "institute", name: "Helix Sanitation Run", description: "Supply a sealed research ward.", cost: { medicine: 6, catalyst: 3, rations: 6 }, reward: { credits: 360, reputation: 11 } },
+  { id: "ore-survey", faction: "prospectors", name: "Deep Ore Survey", description: "Deliver a mixed ore analysis package.", cost: { cobalt: 18, iridium: 6, data: 8 }, reward: { credits: 430, reputation: 13 } },
+  { id: "patrol-ammunition", faction: "patrol", name: "Patrol Ammunition Reserve", description: "Resupply a listening post under pressure.", cost: { missiles: 12, powerCell: 4, plating: 5 }, reward: { credits: 520, reputation: 14 } },
+  { id: "corsair-manifest", faction: "corsairs", name: "Corsair Manifest", description: "Trade recovered artefacts for a verified route manifest.", cost: { relic: 8, artefact: 1, salvage: 30 }, reward: { credits: 610, reputation: 12 } },
+  { id: "silent-relay", faction: "frontier", name: "Silent Relay Lifeline", description: "Keep a remote relay supplied in machine territory.", cost: { fuelRod: 5, circuits: 10, medicine: 6 }, reward: { credits: 760, reputation: 16 } },
+  { id: "institute-specimens", faction: "institute", name: "Institute Specimen Vault", description: "Deliver stabilised xenological samples.", cost: { catalyst: 8, neuralGel: 3, data: 20 }, reward: { credits: 820, reputation: 17 } },
 ];
 
 export const expeditions: { id: string; name: string; minutes: number; level: number; description: string; cost: Record<string, number>; reward: Record<string, number>; collection: string; vehicle?: VehicleId }[] = [

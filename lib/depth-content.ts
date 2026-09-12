@@ -88,4 +88,8 @@ export const missionDefinitions = [
   { id: "machine-language", name: "The Machine Language", description: "Reach Science, Diplomacy and Archaeology level 50.", reward: { ancientCore: 2, credits: 1200 } },
   { id: "foundry-war", name: "The Foundry War", description: "Defeat the Sentinel Foundry and construct a Silent outpost.", reward: { neutroniumPlate: 10, singularityCore: 1 } },
   { id: "starfall-protocol", name: "The Starfall Protocol", description: "Defeat the Machine Intelligence Core and reach total level 1,000.", reward: { commandToken: 1, credits: 5000 } },
+  { id: "helix-remnant", name: "The Helix Remnant", description: "Reach Medicine and Science level 20, then defeat 15 Helix Security Automata.", reward: { neuralGel: 10, credits: 900 } },
+  { id: "corsair-accord", name: "Corsair Accord", description: "Complete 10 contracts and reach Diplomacy level 25.", reward: { phaseCrystal: 6, credits: 1100 } },
+  { id: "rift-cartographer", name: "The Rift Cartographer", description: "Reach Astrogation level 45 and complete 6 expeditions.", reward: { voidData: 16, quantumCircuit: 6 } },
+  { id: "silent-witness", name: "Silent Witness", description: "Record 55 discoveries and defeat the Rift Leviathan.", reward: { ancientCore: 3, credits: 2200 } },
 ] as const;

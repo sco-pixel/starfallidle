@@ -592,6 +592,26 @@ h3 { font-size: 1rem; }
 .research-node small { color: #c1a15d; font: .68rem var(--font-mono); }
 .research-node button { min-width: 110px; border-radius: 0; }
 
+.directive-board, .directive-section { display: grid; gap: 10px; }
+.directive-board { gap: 18px; }
+.directive-overview { padding: 16px; display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; align-items: center; border-left: 2px solid #d4a348; }
+.directive-overview h2 { margin-top: 3px; }
+.directive-overview p:not(.eyebrow) { margin-top: 5px; color: #8d9baa; font-size: .8rem; line-height: 1.45; }
+.directive-counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.directive-counts span { min-height: 66px; padding: 8px; border: 1px solid #314152; display: grid; align-content: center; gap: 3px; color: #8d9baa; font: .62rem var(--font-mono); text-transform: uppercase; }
+.directive-counts strong { color: #e5b45a; font: 700 1.05rem var(--font-mono); }
+.completed-archive { border: 1px solid #2f4050; background: #0b131c; }
+.completed-archive summary { min-height: 44px; padding: 0 12px; display: flex; align-items: center; gap: 9px; cursor: pointer; color: #afbdc9; font: .68rem var(--font-mono); text-transform: uppercase; list-style: none; }
+.completed-archive summary::-webkit-details-marker { display: none; }
+.completed-archive summary b { margin-left: auto; min-width: 24px; text-align: center; color: #e5b45a; }
+.completed-archive summary svg { width: 16px; transition: transform .16s ease; }
+.completed-archive[open] summary svg { transform: rotate(90deg); }
+.completed-archive > div { padding: 0 12px 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.completed-archive > div > span { padding: 5px 7px; border: 1px solid #2e4050; color: #8392a1; font: .64rem var(--font-mono); }
+.missing-cost, .ready-cost { display: block; margin-top: 7px; font: .66rem var(--font-mono); line-height: 1.35; }
+.missing-cost { color: #d68776; }
+.ready-cost { color: #6fbd9e; }
+
 .collection-groups { display: grid; gap: 20px; }
 .depth-panel { margin-bottom: 12px; padding: 17px; display: grid; gap: 15px; }
 .depth-panel h2 { margin-top: 4px; }
@@ -857,6 +877,7 @@ h3 { font-size: 1rem; }
   .faction-strip { grid-template-columns: repeat(2, 1fr); }
   .research-node { grid-template-columns: 34px 1fr; }
   .research-node button { grid-column: 1 / -1; width: 100%; }
+  .directive-overview { grid-template-columns: 1fr; }
   .collection-grid { grid-template-columns: repeat(2, 1fr); }
   .market-overview { grid-template-columns: 1fr; gap: 15px; }
   .market-metrics { width: 100%; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #394252; border-left: 0; }
