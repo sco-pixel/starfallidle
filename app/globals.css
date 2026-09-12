@@ -502,12 +502,32 @@ h3 { font-size: 1rem; }
 .module-card p:not(.eyebrow) { margin-top: 3px; color: #8c9aa8; font-size: .78rem; }
 .module-card button { grid-column: 1 / -1; width: 100%; }
 
+.crew-overview { margin-bottom: 10px; padding: 16px; display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; align-items: center; border-left: 2px solid #d4a348; }
+.crew-overview h2 { margin-top: 3px; }
+.crew-overview p:not(.eyebrow) { margin-top: 5px; color: #8d9baa; font-size: .8rem; line-height: 1.5; }
+.crew-overview-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.crew-overview-metrics span { min-height: 68px; padding: 9px; display: grid; align-content: center; gap: 3px; border: 1px solid #314152; color: #8c9baa; font-size: .67rem; text-transform: uppercase; }
+.crew-overview-metrics strong { color: #e5b45a; font: 700 1.05rem var(--font-mono); }
 .crew-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.crew-card { min-height: 112px; padding: 14px; display: grid; grid-template-columns: 43px 1fr; gap: 11px; align-items: center; }
-.crew-avatar { width: 43px; height: 43px; border: 1px solid #536579; display: grid; place-items: center; color: #e3b35a; font: 700 .75rem var(--font-mono); background: #0a1119; }
+.crew-card { min-height: 290px; padding: 14px; display: grid; gap: 11px; align-content: start; border-left: 2px solid #354456; }
+.crew-card.specialist-post { border-left-color: #d4a348; background: linear-gradient(105deg, #17140d, #0d151e 60%); }
+.crew-card-head { display: grid; grid-template-columns: 46px 1fr; gap: 11px; align-items: start; }
+.crew-avatar { width: 46px; height: 46px; border: 1px solid #536579; display: grid; place-items: center; color: #e3b35a; font: 700 .75rem var(--font-mono); background: #0a1119; }
 .crew-card h3 { margin-top: 2px; }
-.crew-card span { color: #8795a4; font-size: .73rem; }
-.crew-card [data-slot="select-trigger"] { grid-column: 1 / -1; width: 100%; border-radius: 0; background: #0a1119; }
+.crew-bio { margin-top: 4px; color: #8998a7; font-size: .76rem; line-height: 1.35; }
+.crew-specialties { display: flex; flex-wrap: wrap; gap: 5px; }
+.crew-specialties span { min-height: 23px; padding: 3px 6px; border: 1px solid #344456; display: inline-flex; align-items: center; gap: 4px; color: #b8c5d0; font: .61rem var(--font-mono); }
+.crew-specialties span:first-child { color: #e6b45a; border-color: #745a2c; }
+.crew-specialties svg { width: 12px; height: 12px; }
+.crew-effect { padding: 9px 10px; border: 1px solid #344455; background: #091018; display: grid; gap: 4px; }
+.crew-effect strong { color: #d8e3ec; font: 700 .69rem var(--font-mono); }
+.crew-effect span { color: #8c9ba9; font-size: .7rem; line-height: 1.35; }
+.specialist-post .crew-effect { border-color: #80632f; background: #d3a1450a; }
+.crew-progress { display: grid; gap: 4px; }
+.crew-progress > div { display: flex; justify-content: space-between; gap: 8px; color: #8191a0; font: .61rem var(--font-mono); }
+.crew-progress [data-slot="progress"] { height: 4px; }
+.crew-posting { display: grid; gap: 5px; color: #9dabba; font: .62rem var(--font-mono); text-transform: uppercase; }
+.crew-posting [data-slot="select-trigger"] { width: 100%; border-radius: 0; background: #0a1119; }
 
 .combat-summary {
   padding: 16px; margin-bottom: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-items: center;
@@ -799,7 +819,7 @@ h3 { font-size: 1rem; }
   .v3-status .side-nav { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); }
   .v3-status .save-state { min-height: 100%; }
   .power-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .game-layout.v3.hiscores-mode { grid-template-columns: minmax(0, 1fr); }
+  .game-layout.v3.hiscores-mode { grid-template-columns: 225px minmax(470px, 1fr); }
   .hiscores-layout { grid-template-columns: 210px minmax(430px, 1fr); }
   .hiscore-personal { grid-column: 1 / -1; grid-template-columns: 1fr 1.5fr 1fr; }
 }
@@ -817,6 +837,7 @@ h3 { font-size: 1rem; }
   .sector-card { grid-template-columns: 36px 1fr; }
   .sector-card button { grid-column: 1 / -1; width: 100%; }
   .module-grid, .crew-grid { grid-template-columns: 1fr; }
+  .crew-overview { grid-template-columns: 1fr; }
   .outpost-overview { grid-template-columns: 1fr; }
   .outpost-resources { justify-content: flex-start; }
   .outpost-card { grid-template-columns: 32px 1fr; padding: 13px; }

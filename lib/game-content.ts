@@ -174,16 +174,16 @@ export const shipModules: Record<ShipModuleId, { name: string; description: stri
 };
 
 export const crew = [
-  { id: "mara", name: "Mara Venn", role: "Captain", trait: "Steady Hand" },
-  { id: "jonas", name: "Jonas Rhee", role: "Chief Engineer", trait: "Improviser" },
-  { id: "priya", name: "Priya Nadir", role: "Science Officer", trait: "Pattern Seeker" },
-  { id: "okafor", name: "Dr Okafor", role: "Medical Officer", trait: "Calm Under Fire" },
-  { id: "sol", name: "Sol Mercer", role: "Tactical Officer", trait: "Deadeye" },
-  { id: "mei", name: "Mei Navarro", role: "Xenobotanist", trait: "Green Thumb" },
-  { id: "rook", name: "Rook-7", role: "Drone Controller", trait: "Parallel Mind" },
-  { id: "elias", name: "Elias Ward", role: "Quartermaster", trait: "Nothing Wasted" },
-  { id: "vega", name: "Vega Holt", role: "Salvage Lead", trait: "Voidwalker" },
-  { id: "anya", name: "Anya Sato", role: "Archaeologist", trait: "Old Languages" },
+  { id: "mara", name: "Mara Venn", role: "Captain", trait: "Steady Hand", specialties: ["astrogation", "diplomacy"] as SkillId[], bio: "A former convoy commander who keeps a cold bridge and a warmer crew.", perk: "Command instinct: +1 output in Astrogation or Diplomacy." },
+  { id: "jonas", name: "Jonas Rhee", role: "Chief Engineer", trait: "Improviser", specialties: ["engineering", "metallurgy"] as SkillId[], bio: "He can rebuild a failed coil from a cargo latch and a bad idea.", perk: "Fabricator’s eye: +1 output in Engineering or Metallurgy." },
+  { id: "priya", name: "Priya Nadir", role: "Science Officer", trait: "Pattern Seeker", specialties: ["science", "archaeology"] as SkillId[], bio: "Priya reads dead signals as if they were unfinished conversations.", perk: "Signal literacy: +1 output in Science or Archaeology." },
+  { id: "okafor", name: "Dr Okafor", role: "Medical Officer", trait: "Calm Under Fire", specialties: ["medicine", "biochemistry"] as SkillId[], bio: "A field surgeon who treats every emergency as a solvable equation.", perk: "Clinical discipline: +1 output in Medicine or Biochemistry." },
+  { id: "sol", name: "Sol Mercer", role: "Tactical Officer", trait: "Deadeye", specialties: ["combat"] as SkillId[], bio: "Sol studies engagement footage until every escape vector becomes familiar.", perk: "Target lock: +1 Combat output." },
+  { id: "mei", name: "Mei Navarro", role: "Xenobotanist", trait: "Green Thumb", specialties: ["botany", "biochemistry"] as SkillId[], bio: "Mei keeps a forbidden seed archive behind the hydroponics bulkhead.", perk: "Closed-loop cultivation: +1 output in Xenobotany or Biochemistry." },
+  { id: "rook", name: "Rook-7", role: "Drone Controller", trait: "Parallel Mind", specialties: ["drones", "mining"] as SkillId[], bio: "An ex-industrial control unit learning to enjoy the sound of a living crew.", perk: "Swarm intuition: +1 output in Drone Command or Mining." },
+  { id: "elias", name: "Elias Ward", role: "Quartermaster", trait: "Nothing Wasted", specialties: ["logistics", "diplomacy"] as SkillId[], bio: "Elias knows every crate, favour and spare ration on the cruiser by memory.", perk: "Supply sense: +1 output in Logistics or Diplomacy." },
+  { id: "vega", name: "Vega Holt", role: "Salvage Lead", trait: "Voidwalker", specialties: ["salvage", "mining"] as SkillId[], bio: "Vega is happiest outside the hull with a cutter and a very short tether.", perk: "Wreck sense: +1 output in Salvage or Mining." },
+  { id: "anya", name: "Anya Sato", role: "Archaeologist", trait: "Old Languages", specialties: ["archaeology", "science"] as SkillId[], bio: "Anya can identify a civilisation from a hinge, a glyph or a burial pattern.", perk: "Contextual recall: +1 output in Archaeology or Science." },
 ];
 
 export const droneSpecs: Record<DroneId, { name: string; description: string; cost: Record<string, number> }> = {
