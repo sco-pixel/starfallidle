@@ -200,7 +200,8 @@ function combatHitChance(state: GameState, activity: SkillActivity) {
   const gear = state.equippedGear === "gearPhaseLance" ? 12 : state.equippedGear === "gearStarfallCrown" ? 6 : 0;
   const disruption = state.statusEffects.includes("sensorDisruption") ? -8 : 0;
   const path = state.researchPath === "military" ? 6 : 0;
-  return Math.max(45, Math.min(99, 78 + weaponTracking + training + systems + gear + disruption + path - activity.enemy.evasion));
+  const tacticalOfficer = state.crewAssignments.sol === "combat" ? 5 : 0;
+  return Math.max(45, Math.min(99, 78 + weaponTracking + training + systems + gear + disruption + path + tacticalOfficer - activity.enemy.evasion));
 }
 function combatMatchup(state: GameState, activity: SkillActivity) {
   if (!activity.enemy) return { hitChance: 100, weakness: false, time: 1 };
@@ -208,7 +209,7 @@ function combatMatchup(state: GameState, activity: SkillActivity) {
   const defense = state.combat.weapon === "laser" ? activity.enemy.shields : state.combat.weapon === "railgun" ? activity.enemy.armor : activity.enemy.evasion;
   const weaponSpeed = state.combat.weapon === "laser" ? 0.9 : state.combat.weapon === "missile" ? 1.06 : 1;
   const stanceSpeed = state.combat.stance === "aggressive" ? (state.skills.combat.level >= 10 ? 0.78 : 0.83) : state.combat.stance === "defensive" ? 1.2 : 1;
-  const matchup = weakness ? 0.76 : 1 + defense / 180;
+  const matchup = weakness ? 0.68 : 1 + defense / 150;
   const hitChance = combatHitChance(state, activity);
   return { hitChance, weakness, time: weaponSpeed * stanceSpeed * matchup * (100 / hitChance) };
 }
@@ -255,7 +256,9 @@ function combatDamage(state: GameState, activity: SkillActivity) {
   const bossAnalysis = state.researchUnlocked.includes("boss-analysis") && activity.enemy?.class.includes("Boss") ? 0.85 : 1;
   const unique = state.equippedGear === "gearLivingBulwark" ? 0.85 : state.equippedGear === "gearStarfallCrown" ? 0.925 : 1;
   const breach = state.statusEffects.includes("hullBreach") ? 1.18 : 1;
-  return Math.max(1, Math.floor((activity.damage - mitigation) * protocol * stance * veteran * bossAnalysis * unique * breach));
+  const droneController = state.crewAssignments.rook === "drones" ? Math.min(4, state.drones.combat) : 0;
+  const chiefEngineer = state.crewAssignments.jonas === "engineering" ? 1 : 0;
+  return Math.max(1, Math.floor((activity.damage - mitigation - droneController - chiefEngineer) * protocol * stance * veteran * bossAnalysis * unique * breach));
 }
 function activityCosts(state: GameState, activity: SkillActivity) {
   const costs = { ...(activity.consumes ?? {}) };
@@ -335,8 +338,9 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
   let hull = Math.max(0, state.hull - Math.max(0, damage * count - absorbed));
   let morale = state.crewMorale;
   const factions = { ...state.factions };
-  if (activity.id === "hull-repair") hull = Math.min(state.maxHull, hull + (18 + (state.researchUnlocked.includes("autonomous-repair") ? 8 : 0)) * count);
-  if (activity.id === "hull-repair") shields = Math.min(40 + state.equipment.shield * 10, shields + 6 * count);
+  const repairStrength = activity.id === "hull-repair" ? 18 : activity.id === "armour-plating-repair" ? 44 : activity.id === "reactor-grid-repair" ? 85 : 0;
+  if (repairStrength) hull = Math.min(state.maxHull, hull + (repairStrength + (state.researchUnlocked.includes("autonomous-repair") ? 8 : 0)) * count);
+  if (repairStrength) shields = Math.min(40 + state.equipment.shield * 10, shields + Math.ceil(repairStrength / 3) * count);
   if (activity.skillId === "medicine") morale = Math.min(100, morale + 2 * count);
   if (activity.skillId === "diplomacy") factions.frontier = Math.min(100, factions.frontier + count);
   const totalActionsAfter = state.totalActions + count;
@@ -360,7 +364,7 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
       const effect = effects[Math.floor((priorVictories + count) / 25) % effects.length];
       if (!statusEffects.includes(effect)) statusEffects.push(effect);
     }
-  } else if (activity.id === "hull-repair") combat = { ...combat, streak: 0 };
+  } else if (repairStrength) combat = { ...combat, streak: 0 };
   if (activity.skillId === "medicine") statusEffects = statusEffects.filter((effect) => effect !== "radiation");
   if (activity.skillId === "engineering") statusEffects = statusEffects.filter((effect) => effect !== "hullBreach");
   if (activity.skillId === "science") statusEffects = statusEffects.filter((effect) => effect !== "sensorDisruption");
@@ -1064,6 +1068,7 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
   const activeTarget = activeCandidate?.skillId === "combat" ? activeCandidate : null;
   const combatPauseReasons = activeTarget ? operationPauseReasons(state, activeTarget) : [];
   const combatPaused = combatPauseReasons.length > 0;
+  const bossPhase = activeTarget?.enemy?.class.includes("Boss") ? state.combat.progress < 34 ? "Phase 1 · screening defences" : state.combat.progress < 67 ? "Phase 2 · weapons response" : "Phase 3 · final countermeasure" : null;
   const totalVictories = Object.values(state.combat.victories).reduce((a, b) => a + b, 0);
   const milestones = [
     [5, "Targeting Suite", "+5% hit chance"], [10, "Overcharge", "Aggressive stance attacks faster"],
@@ -1081,7 +1086,7 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
     <section className={`combat-operation panel ${activeTarget ? "active" : ""}`}>
       <div><p className="eyebrow">VESSEL COMBAT · LEVEL {state.skills.combat.level} · {fmt(state.skills.combat.xp)} XP · RUNS IN PARALLEL</p><h2>{activeTarget ? `Engaging ${activeTarget.name}` : "No hostile target selected"}</h2><p>{activeTarget ? `Combat continues while ${skillMeta[state.activeTask.skillId].name} trains independently.` : "Choose a target below. Your Skill Matrix activity will continue uninterrupted."}</p></div>
       <Progress value={activeTarget ? state.combat.progress : 0} />
-      <strong>{activeTarget ? combatPaused ? `Paused · ${combatPauseReasons.join(" · ")}` : `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s encounter` : "Fire control standing by"}</strong>
+      <strong>{activeTarget ? combatPaused ? `Paused · ${combatPauseReasons.join(" · ")}` : `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s encounter${bossPhase ? ` · ${bossPhase}` : ""}` : "Fire control standing by"}</strong>
       {activeTarget ? <Button variant="outline" onClick={onStop}>Disengage</Button> : null}
     </section>
     <section className="combat-control panel">
@@ -1106,6 +1111,7 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
         <p>{target.description}</p>
         <div className="target-stats"><span>Hull <b>{enemy.hull}</b></span><span>Shield <b>{enemy.shields}</b></span><span>Armor <b>{enemy.armor}</b></span><span>Evasion <b>{enemy.evasion}</b></span></div>
         <div className="matchup-readout"><span className={matchup.weakness ? "advantage" : ""}>{matchup.weakness ? "WEAKNESS EXPLOITED" : `Weak to ${weaponNames[enemy.weakness]}`}</span><span>{matchup.hitChance}% hit · {actionSeconds(state, target).toFixed(1)}s · {combatDamage(state, target)} incoming</span></div>
+        <em className="combat-profile">{enemy.weakness === "laser" ? "Shielded profile — pulse lasers break through fastest." : enemy.weakness === "railgun" ? "Armoured profile — railguns resolve it fastest." : "Evasive profile — guided missiles track it fastest."}</em>
         <small>Standard: {itemsText(target.produces)} · Rare in {rareIn}: {itemsText(enemy.rareDrop)}</small>
         {!available ? <em className="combat-unavailable">{unavailableReasons[0]}</em> : <em className="combat-ready">Ready to engage</em>}
         <Button disabled={!available || active} onClick={() => onEngage(target)}>{active ? "Engaging" : available ? "Engage target" : "Requirements unmet"}</Button>

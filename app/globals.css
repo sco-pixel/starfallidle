@@ -581,6 +581,7 @@ h3 { font-size: 1rem; }
 .combat-target > small { color: #c4a45f; font: .64rem var(--font-mono); }
 .combat-unavailable, .combat-ready { min-height: 31px; padding: 7px 8px; border: 1px solid #3d3436; display: block; color: #d48d81; font: .63rem var(--font-mono); line-height: 1.35; background: #211314; }
 .combat-ready { border-color: #335c50; color: #75c6a5; background: #0b1c18; }
+.combat-profile { display: block; margin-top: 7px; color: #8ba0b1; font: .68rem var(--font-mono); font-style: normal; }
 .combat-target > button { width: 100%; border-radius: 0; }
 .combat-milestones { margin-top: 10px; padding: 14px; display: grid; grid-template-columns: 1.2fr repeat(4, 1fr); gap: 8px; align-items: stretch; }
 .combat-milestones > div:not(:first-child) { padding: 9px; border: 1px solid #2c3947; display: grid; gap: 3px; opacity: .48; }
