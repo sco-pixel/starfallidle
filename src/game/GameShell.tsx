@@ -26,6 +26,7 @@ import {
 } from "@/lib/game-state";
 import { Sprite } from "@/components/game/Sprite";
 import { CombatSprite } from "@/components/game/CombatSprite";
+import { advanceCombat, combatAttackProfile, combatPauseReason, prepareCombatEncounter, type CombatHooks } from "@/lib/combat-engine";
 
 type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "character" | "outposts";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
@@ -246,13 +247,16 @@ function combatDamage(state: GameState, activity: SkillActivity) {
 function activityCosts(state: GameState, activity: SkillActivity) {
   const costs = { ...(activity.consumes ?? {}) };
   if ((state.operationMastery[activity.id] ?? 0) >= 50) Object.keys(costs).forEach((id) => { costs[id] = Math.max(0, costs[id] - 1); });
-  if (activity.skillId === "combat" && state.combat.weapon === "missile") costs.missiles = (costs.missiles ?? 0) + 1;
   return costs;
 }
 function activityAvailable(state: GameState, activity: SkillActivity) {
   return !activity.sectors || activity.sectors.includes(state.sectorId);
 }
 function operationPauseReasons(state: GameState, activity: SkillActivity) {
+  if (activity.skillId === "combat" && activity.enemy) {
+    const reason = combatPauseReason(state, activity, combatHooks);
+    return reason ? [reason] : [];
+  }
   const reasons: string[] = [];
   if (state.skills[activity.skillId].level < activity.level) reasons.push(`Requires ${skillMeta[activity.skillId].name} level ${activity.level}; current level is ${state.skills[activity.skillId].level}`);
   if (!activityAvailable(state, activity)) {
@@ -298,12 +302,12 @@ function applyAchievements(state: GameState) {
   const earned = achievements.filter((entry) => entry.met(state)).map((entry) => entry.id);
   return { ...state, achievements: Array.from(new Set([...state.achievements, ...earned])) };
 }
-function completeActions(state: GameState, activity: SkillActivity, requested: number) {
+function completeActions(state: GameState, activity: SkillActivity, requested: number, combatVictory = false) {
   if (state.skills[activity.skillId].level < activity.level) return { state, count: 0 };
   let count = Math.max(0, Math.floor(requested));
-  const costs = activityCosts(state, activity);
-  for (const [id, amount] of Object.entries(costs)) count = Math.min(count, Math.floor((state.inventory[id] ?? 0) / amount));
-  const damage = combatDamage(state, activity);
+  const costs = combatVictory ? {} : activityCosts(state, activity);
+  for (const [id, amount] of Object.entries(costs)) if (amount > 0) count = Math.min(count, Math.floor((state.inventory[id] ?? 0) / amount));
+  const damage = combatVictory ? 0 : combatDamage(state, activity);
   if (damage) {
     const safeHull = state.maxHull * (state.retreatAt / 100);
     // An encounter may cross the retreat threshold; the next one must then pause.
@@ -399,36 +403,72 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
   });
   return { state: next, count };
 }
+const combatHooks: CombatHooks = {
+  hitChance: combatHitChance,
+  incomingDamage: combatDamage,
+  encounterCosts: activityCosts,
+  awardVictory: (state, target) => completeActions(state, target, 1, true).state,
+  availabilityReasons: (state, target) => {
+    const reasons: string[] = [];
+    if (state.skills.combat.level < target.level) reasons.push(`Requires Combat level ${target.level}; current level is ${state.skills.combat.level}`);
+    if (!activityAvailable(state, target)) reasons.push(`Wrong sector: travel to ${listText((target.sectors ?? []).map((id) => sectorById[id]?.name ?? id))}`);
+    return reasons;
+  },
+};
+
+/** Training completions and individual attacks share the same live/offline timeline. */
+function advanceGameTime(state: GameState, seconds: number, emitHits = true) {
+  let next = state;
+  let remaining = Math.max(0, Math.min(24 * 3600, seconds));
+  let skillActions = 0;
+  let combatActions = 0;
+  while (remaining > 0.000001) {
+    const target = next.combat.activeTaskId ? activityById[next.combat.activeTaskId] : null;
+    if (target?.enemy && target.skillId === "combat") next = prepareCombatEncounter(next, target, combatHooks);
+    const training = activityById[next.activeTask.activityId] ?? activities[0];
+    const ready = operationPauseReasons(next, training).length === 0;
+    const trainingSeconds = actionSeconds(next, training);
+    const untilTraining = ready ? Math.max(0.000001, (100 - next.progress) / 100 * trainingSeconds) : Infinity;
+    let untilCombat = Infinity;
+    if (target?.enemy && target.skillId === "combat") {
+      const encounter = next.combat.encounter?.targetId === target.id ? next.combat.encounter : null;
+      if (encounter && encounter.enemyHull <= 0) untilCombat = encounter.spawnDelay;
+      else if (!combatPauseReason(next, target, combatHooks)) {
+        const profile = combatAttackProfile(next, target);
+        untilCombat = encounter ? Math.min(encounter.playerCooldown, encounter.enemyCooldown) : Math.min(profile.playerInterval, profile.enemyInterval);
+      }
+    }
+    // Recheck training supplies and speed after every attack, reward, or repair event.
+    const step = Math.min(remaining, untilTraining, Math.max(0.000001, untilCombat));
+    const progress = ready ? Math.min(100, next.progress + step / trainingSeconds * 100) : next.progress;
+    if (target?.enemy && target.skillId === "combat") {
+      const result = advanceCombat(next, target, step, combatHooks, { emitHits });
+      next = result.state;
+      combatActions += result.victories;
+    } else if (next.combat.hits.length) {
+      next = { ...next, combat: { ...next.combat, hits: [] } };
+    }
+    next = { ...next, progress };
+    if (ready && progress >= 100 - 0.000001) {
+      const result = completeActions({ ...next, progress: 0 }, training, 1);
+      next = result.state;
+      skillActions += result.count;
+    }
+    remaining -= step;
+  }
+  return { state: next, skillActions, combatActions };
+}
+
 function applyOffline(state: GameState) {
   const cap = 24 * 3600;
   const elapsed = Math.min(cap, Math.max(0, (Date.now() - state.lastActiveAt) / 1000));
   const beforeInventory = state.inventory;
   const beforeXp = Object.values(state.skills).reduce((sum, skill) => sum + skill.xp, 0);
   const firstActivity = activityById[state.activeTask.activityId] ?? activities[0];
-  let next = state;
-  const remainingSeconds = elapsed;
-  let skillActions = 0;
-  const activity = activityById[next.activeTask.activityId] ?? activities[0];
-  const seconds = actionSeconds(next, activity);
-  const available = remainingSeconds + next.progress / 100 * seconds;
-  const requested = Math.floor(available / seconds);
-  if (!requested) next = { ...next, progress: Math.min(99.9, available / seconds * 100) };
-  else {
-    const result = completeActions(next, activity, requested);
-    skillActions = result.count;
-    const leftover = Math.max(0, available - result.count * seconds);
-    next = { ...result.state, progress: result.count < requested ? 0 : Math.min(99.9, leftover / seconds * 100) };
-  }
-  let combatActions = 0;
+  const simulation = advanceGameTime(state, elapsed, false);
+  const next = simulation.state;
+  const { skillActions, combatActions } = simulation;
   const combatActivity = next.combat.activeTaskId ? activityById[next.combat.activeTaskId] : null;
-  if (combatActivity?.skillId === "combat") {
-    const combatSeconds = actionSeconds(next, combatActivity);
-    const combatRequested = Math.floor((elapsed + next.combat.progress / 100 * combatSeconds) / combatSeconds);
-    const combatResult = completeActions(next, combatActivity, combatRequested);
-    combatActions = combatResult.count;
-    const combatProgress = combatResult.count < combatRequested ? 0 : Math.min(99.9, ((elapsed + next.combat.progress / 100 * combatSeconds - combatResult.count * combatSeconds) / combatSeconds) * 100);
-    next = { ...combatResult.state, combat: { ...combatResult.state.combat, progress: combatProgress } };
-  }
   const gains: Record<string, number> = {};
   Object.entries(next.inventory).forEach(([id, amount]) => {
     const gain = amount - (beforeInventory[id] ?? 0);
@@ -522,27 +562,9 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     const timer = setInterval(() => {
       setNow(Date.now());
       setState((current) => {
-        let next = completeExpedition(current);
-        let completed = false;
-        const activity = activityById[next.activeTask.activityId] ?? activities[0];
-        if (!operationPauseReasons(next, activity).length) {
-          const progress = next.progress + 100 / (actionSeconds(next, activity) * 4);
-          if (progress >= 100) {
-            const result = completeActions({ ...next, progress: progress - 100 }, activity, 1);
-            next = result.state;
-            completed = result.count > 0;
-          } else next = { ...next, progress };
-        }
-        const combatActivity = next.combat.activeTaskId ? activityById[next.combat.activeTaskId] : null;
-        const combatReady = combatActivity?.skillId === "combat" && !operationPauseReasons(next, combatActivity).length;
-        if (combatActivity && combatReady) {
-          const progress = next.combat.progress + 100 / (actionSeconds(next, combatActivity) * 4);
-          if (progress >= 100) {
-            const result = completeActions({ ...next, combat: { ...next.combat, progress: progress - 100 } }, combatActivity, 1);
-            next = result.state;
-            completed = completed || result.count > 0;
-          } else next = { ...next, combat: { ...next.combat, progress } };
-        }
+        const simulation = advanceGameTime(completeExpedition(current), 0.25);
+        const next = simulation.state;
+        const completed = simulation.skillActions > 0 || simulation.combatActions > 0;
         stateRef.current = next;
         if (completed) queueSave(next);
         return next;
@@ -568,11 +590,11 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
   const startCombat = useCallback((activity: SkillActivity) => {
     const current = stateRef.current;
-    if (activity.skillId !== "combat" || operationPauseReasons(current, activity).length) return;
-    updateState((entry) => ({ ...entry, combat: { ...entry.combat, activeTaskId: activity.id, progress: 0 }, lastActiveAt: Date.now() }));
+    if (activity.skillId !== "combat" || current.combat.activeTaskId === activity.id || operationPauseReasons(current, activity).length) return;
+    updateState((entry) => ({ ...entry, combat: { ...entry.combat, activeTaskId: activity.id, progress: 0, encounter: null, hits: [] }, lastActiveAt: Date.now() }));
   }, [updateState]);
 
-  const stopCombat = useCallback(() => updateState((entry) => ({ ...entry, combat: { ...entry.combat, activeTaskId: null, progress: 0 }, lastActiveAt: Date.now() })), [updateState]);
+  const stopCombat = useCallback(() => updateState((entry) => ({ ...entry, combat: { ...entry.combat, activeTaskId: null, progress: 0, encounter: null, hits: [] }, lastActiveAt: Date.now() })), [updateState]);
 
   const active = activityById[state.activeTask.activityId] ?? activities[0];
   const activeSkill = state.skills[active.skillId];
@@ -948,10 +970,21 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
   const previewTarget = activeTarget ?? activityById["scavenger-drone"];
   const previewEnemy = previewTarget.enemy!;
   const previewMatchup = combatMatchup(state, previewTarget);
-  const combatState = activeTarget ? combatPaused ? "paused" : "running" : "standby";
+  const attackProfile = combatAttackProfile(state, previewTarget);
+  const encounter = state.combat.encounter?.targetId === previewTarget.id ? state.combat.encounter : null;
+  const enemyHull = encounter?.enemyHull ?? previewEnemy.hull;
+  const enemyShields = encounter?.enemyShields ?? previewEnemy.shields;
+  const combatState = activeTarget ? encounter?.spawnDelay ? "respawning" : combatPaused ? "paused" : "running" : "standby";
   const repairActivity = bestRepairActivity(state);
   const repairing = Boolean(repairActivity && state.activeTask.activityId === repairActivity.id);
-  const bossPhase = activeTarget?.enemy?.class.includes("Boss") ? state.combat.progress < 34 ? "Phase 1 · screening defences" : state.combat.progress < 67 ? "Phase 2 · weapons response" : "Phase 3 · final countermeasure" : null;
+  const bossPhase = activeTarget?.enemy?.class.includes("Boss") ? enemyHull > previewEnemy.hull * .66 ? "Phase 1 · screening defences" : enemyHull > previewEnemy.hull * .33 ? "Phase 2 · weapons response" : "Phase 3 · final countermeasure" : null;
+  const renderHits = (target: "player" | "enemy") => <div className="combat-hits" aria-hidden="true">{state.combat.hits.filter((hit) => hit.target === target).flatMap((hit) => {
+    const style = { "--hit-lane": hit.id % 3 } as CSSProperties;
+    return hit.miss ? [<span key={`${hit.id}-miss`} className="combat-hit is-miss" style={style}>MISS</span>] : [
+      hit.shieldDamage > 0 ? <span key={`${hit.id}-shield`} className="combat-hit is-shield" style={style}>−{hit.shieldDamage}</span> : null,
+      hit.hullDamage > 0 ? <span key={`${hit.id}-hull`} className="combat-hit is-hull" style={{ "--hit-lane": (hit.id + 1) % 3 } as CSSProperties}>−{hit.hullDamage}</span> : null,
+    ];
+  })}</div>;
   const totalVictories = Object.values(state.combat.victories).reduce((a, b) => a + b, 0);
   const milestones = [
     [5, "Targeting Suite", "+5% hit chance"], [10, "Overcharge", "Aggressive stance attacks faster"],
@@ -965,31 +998,42 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
     </div>
     <div className="combat-workspace">
       <section className="combat-battle panel" aria-label="Vessel combat">
-        <div className="combat-stage-heading"><div><p className="eyebrow">VESSEL COMBAT · LEVEL {state.skills.combat.level} · {fmt(state.skills.combat.xp)} XP</p><h2>{activeTarget ? activeTarget.name : "Fire control standing by"}</h2></div><span className={`combat-stage-status is-${combatState}`}>{combatState === "running" ? "Engaging" : combatState === "paused" ? "Paused" : "Standby"}</span></div>
-        <div className={`combat-stage is-${combatState} weapon-${state.combat.weapon}`} style={{ "--encounter-duration": `${actionSeconds(state, previewTarget)}s` } as CSSProperties}>
+        <div className="combat-stage-heading"><div><p className="eyebrow">VESSEL COMBAT · LEVEL {state.skills.combat.level} · {fmt(state.skills.combat.xp)} XP</p><h2>{activeTarget ? activeTarget.name : "Fire control standing by"}</h2></div><span className={`combat-stage-status is-${combatState}`}>{combatState === "running" ? "Engaging" : combatState === "paused" ? "Paused" : combatState === "respawning" ? "Target destroyed" : "Standby"}</span></div>
+        <div className={`combat-stage is-${combatState} weapon-${state.combat.weapon}`}>
           <CombatSprite id="asteroid" label="" className="combat-asteroid combat-asteroid-one" decorative />
           <CombatSprite id="asteroid" label="" className="combat-asteroid combat-asteroid-two" decorative />
           <CombatSprite id="asteroid" label="" className="combat-asteroid combat-asteroid-three" decorative />
           <div className="combat-vessel combat-vessel-player">
             <div className="combat-vessel-art"><span className="combat-thruster" aria-hidden="true" /><CombatSprite id="aethelgard" label="Aethelgard" className="combat-ship-sprite" decorative loading="eager" />{state.shields > 0 ? <span className="combat-shield" aria-hidden="true" /> : null}</div>
-            <div className="combat-vessel-label"><strong>Aethelgard</strong><span>{weaponNames[state.combat.weapon]} · {stanceNames[state.combat.stance]}</span></div>
+            {renderHits("player")}
+            <div className="combat-vessel-label"><strong>Aethelgard</strong><div className="combat-vitals">
+              <div className="combat-vital is-shield"><span>Shields {state.shields} / {40 + state.equipment.shield * 10}</span><Progress aria-label="Your shields" value={state.shields / (40 + state.equipment.shield * 10) * 100} /></div>
+              <div className="combat-vital is-hull"><span>Hull {state.hull} / {state.maxHull}</span><Progress aria-label="Your hull" value={state.hull / state.maxHull * 100} /></div>
+            </div></div>
           </div>
-          <span className="combat-shot" aria-hidden="true" /><span className="combat-shot combat-shot-enemy" aria-hidden="true" />
+          {state.combat.hits.map((hit) => <span key={`shot-${hit.id}`} className={`combat-shot is-fired weapon-${hit.weapon === "enemy" ? "laser" : hit.weapon}${hit.target === "player" ? " combat-shot-enemy" : ""}`} aria-hidden="true" />)}
           <div className="combat-vessel combat-vessel-enemy">
             <div className="combat-vessel-art"><CombatSprite id={previewTarget.id} label={previewTarget.name} className="combat-ship-sprite" decorative loading="eager" /></div>
-            <div className="combat-vessel-label"><strong>{previewTarget.name}</strong><span>{activeTarget ? `${previewEnemy.class} · Level ${previewTarget.level}` : "Preview · select Engage below"}</span></div>
+            {renderHits("enemy")}
+            <div className="combat-vessel-label"><strong>{previewTarget.name}</strong><div className="combat-vitals">
+              <div className="combat-vital is-shield"><span>Shields {Math.ceil(enemyShields)} / {previewEnemy.shields}</span><Progress aria-label="Enemy shields" value={previewEnemy.shields > 0 ? enemyShields / previewEnemy.shields * 100 : 0} /></div>
+              <div className="combat-vital is-hull"><span>Hull {Math.ceil(enemyHull)} / {previewEnemy.hull}</span><Progress aria-label="Enemy hull" value={enemyHull / previewEnemy.hull * 100} /></div>
+            </div></div>
           </div>
         </div>
         <div className="combat-encounter">
-          <div className="combat-encounter-copy"><span>{activeTarget ? combatPaused ? "Encounter paused" : "Encounter progress" : "Awaiting engagement"}</span><strong>{activeTarget ? `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s / encounter` : "No target engaged"}</strong></div>
-          <Progress aria-label="Encounter progress" value={activeTarget ? state.combat.progress : 0} />
-          {combatPaused ? <p className="combat-unavailable" role="status">{combatPauseReasons.join(" · ")}</p> : activeTarget ? bossPhase ? <p>{bossPhase}</p> : null : <p>Choose a target below to begin. Each completed encounter awards a victory.</p>}
+          <div className="combat-encounter-copy"><strong>{!activeTarget ? "Choose a target to engage" : combatPaused ? "Combat paused" : combatState === "respawning" ? "Victory · acquiring next target" : `${weaponNames[state.combat.weapon]} · ${stanceNames[state.combat.stance]}`}</strong><span>{!activeTarget ? "Target preview · weapons standing by" : combatState === "respawning" ? "The same target repeats automatically." : "Shields absorb hits first. Destroy the enemy hull to win."}</span></div>
+          {activeTarget && combatState !== "respawning" ? <div className="combat-attack-clock">
+            <div><span>Your next shot <strong>{(encounter?.playerCooldown ?? attackProfile.playerInterval).toFixed(1)}s</strong></span><Progress aria-label="Your weapon cooldown" value={encounter ? Math.max(0, 1 - encounter.playerCooldown / attackProfile.playerInterval) * 100 : 0} /></div>
+            <div className="is-enemy"><span>Enemy next shot <strong>{(encounter?.enemyCooldown ?? attackProfile.enemyInterval).toFixed(1)}s</strong></span><Progress aria-label="Enemy weapon cooldown" value={encounter ? Math.max(0, 1 - encounter.enemyCooldown / attackProfile.enemyInterval) * 100 : 0} /></div>
+          </div> : null}
+          {combatPaused ? <p className="combat-unavailable" role="status">{combatPauseReasons.join(" · ")}</p> : bossPhase && activeTarget ? <p>{bossPhase}</p> : null}
           {activeTarget ? <Button variant="outline" onClick={onStop}>Disengage</Button> : null}
         </div>
-        <div className="combat-matchup"><span className={previewMatchup.weakness ? "advantage" : ""}>{previewMatchup.weakness ? "Weakness exploited" : `Weak to ${weaponNames[previewEnemy.weakness]}`}</span><span>{previewMatchup.hitChance}% hit chance</span><span>{combatDamage(state, previewTarget)} incoming / encounter</span></div>
+        <div className="combat-matchup"><span className={previewMatchup.weakness ? "advantage" : ""}>{previewMatchup.weakness ? "Weakness exploited" : `Weak to ${weaponNames[previewEnemy.weakness]}`}</span><span>{previewMatchup.hitChance}% hit chance</span><span>{attackProfile.playerDamage} shot power · {attackProfile.playerInterval.toFixed(1)}s attack</span></div>
       </section>
     <section className="combat-control panel">
-      <div className="combat-control-heading"><p className="eyebrow">FIRE CONTROL</p><h2>Combat doctrine</h2><p>Match weapons to enemy defences. Guided missiles use one missile per victory.</p></div>
+      <div className="combat-control-heading"><p className="eyebrow">FIRE CONTROL</p><h2>Combat doctrine</h2><p>Match weapons to enemy defences. Guided missiles use one missile per shot.</p></div>
       <label><span>Weapon system</span><Select value={state.combat.weapon} onValueChange={(value) => onDoctrine(value as CombatWeapon)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(weaponNames).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></label>
       <label><span>Engagement stance</span><Select value={state.combat.stance} onValueChange={(value) => onDoctrine(undefined, value as CombatStance)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(stanceNames).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></label>
       <label className="retreat-control"><span>Auto-retreat at {state.retreatAt}% hull</span><Slider value={[state.retreatAt]} min={10} max={75} step={5} onValueChange={(value) => onRetreat(value[0])} /></label>
@@ -1004,6 +1048,7 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
       const unavailableReasons = operationPauseReasons(state, target);
       const available = unavailableReasons.length === 0;
       const matchup = combatMatchup(state, target);
+      const targetProfile = combatAttackProfile(state, target);
       const active = state.combat.activeTaskId === target.id;
       const victories = state.combat.victories[target.id] ?? 0;
       const mastery = state.operationMastery[target.id] ?? 0;
@@ -1021,11 +1066,11 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
         <details className="combat-target-details"><summary>Target intelligence <ChevronRight /></summary><div className="combat-target-detail-content">
         <p>{target.description}</p>
         <div className="target-stats"><span>Hull <b>{enemy.hull}</b></span><span>Shield <b>{enemy.shields}</b></span><span>Armor <b>{enemy.armor}</b></span><span>Evasion <b>{enemy.evasion}</b></span></div>
-        <div className="matchup-readout"><span className={matchup.weakness ? "advantage" : ""}>{matchup.weakness ? "WEAKNESS EXPLOITED" : `Weak to ${weaponNames[enemy.weakness]}`}</span><span>{matchup.hitChance}% hit · {actionSeconds(state, target).toFixed(1)}s · {combatDamage(state, target)} incoming</span></div>
-        <em className="combat-profile">{enemy.weakness === "laser" ? "Shielded profile — pulse lasers break through fastest." : enemy.weakness === "railgun" ? "Armoured profile — railguns resolve it fastest." : "Evasive profile — guided missiles track it fastest."}</em>
+        <div className="matchup-readout"><span className={matchup.weakness ? "advantage" : ""}>{matchup.weakness ? "WEAKNESS EXPLOITED" : `Weak to ${weaponNames[enemy.weakness]}`}</span><span>{matchup.hitChance}% hit · {targetProfile.playerDamage} shot power · {targetProfile.playerInterval.toFixed(1)}s attack</span></div>
+        <em className="combat-profile">{enemy.weakness === "laser" ? "Pulse lasers deal extra shield damage." : enemy.weakness === "railgun" ? "Kinetic railguns penetrate more armour." : "Guided missiles track evasive targets."} Enemy volleys deal {combatDamage(state, target)} damage every {targetProfile.enemyInterval.toFixed(1)}s.</em>
         <small>Base rewards: {itemsText(rewards)} · {target.credits ?? 0} credits · {target.xp} Combat XP</small>
         <small>Rare salvage: {itemsText(enemy.rareDrop)} · every {rareInterval} victories · next in {rareIn}</small>
-        <small>Supplies per encounter: {Object.keys(costs).length ? itemsText(costs) : "None"} · Sectors: {target.sectors?.map((id) => sectorById[id]?.name ?? id).join(", ") ?? "All sectors"}</small>
+        <small>Supplies per engagement: {Object.keys(costs).length ? itemsText(costs) : "None"}{state.combat.weapon === "missile" ? " · 1 missile per shot" : ""} · Sectors: {target.sectors?.map((id) => sectorById[id]?.name ?? id).join(", ") ?? "All sectors"}</small>
         {!available ? <div className="combat-unavailable">{unavailableReasons.map((reason) => <p key={reason}>{reason}</p>)}</div> : null}
         </div></details>
       </article>;

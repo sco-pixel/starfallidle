@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "node scripts/test-combat-engine.mjs && node scripts/test-combat-retreat.mjs && node scripts/test-combat-repair.mjs"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",
