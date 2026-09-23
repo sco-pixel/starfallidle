@@ -1,0 +1,32 @@
+.combat-sprite {
+  position: relative;
+  display: inline-block;
+  width: 3rem;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.combat-sprite > .combat-sprite__atlas {
+  position: absolute;
+  display: block;
+  width: 400%;
+  height: 400%;
+  max-width: none;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+.combat-sprite__fallback {
+  position: absolute;
+  inset: 28% 12%;
+  background: currentColor;
+  opacity: .55;
+  clip-path: polygon(0 50%, 45% 12%, 52% 30%, 88% 0, 100% 25%, 85% 50%, 100% 75%, 88% 100%, 52% 70%, 45% 88%);
+}
+
+.combat-sprite--player > .combat-sprite__fallback {
+  transform: scaleX(-1);
+}

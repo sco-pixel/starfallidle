@@ -16,6 +16,24 @@ export type CombatStance = "balanced" | "aggressive" | "defensive";
 export type PowerMode = "balanced" | "industrial" | "research" | "combat" | "navigation";
 export type StatusEffect = "radiation" | "hullBreach" | "sensorDisruption" | "overheating";
 export type OutpostType = "mining" | "research" | "trade";
+export type CombatEncounter = {
+  targetId: string;
+  enemyHull: number;
+  enemyShields: number;
+  playerCooldown: number;
+  enemyCooldown: number;
+  spawnDelay: number;
+  suppliesPaid: boolean;
+};
+export type CombatHit = {
+  id: number;
+  target: "player" | "enemy";
+  shieldDamage: number;
+  hullDamage: number;
+  miss: boolean;
+  weapon: CombatWeapon | "enemy";
+  age: number;
+};
 export type CombatState = {
   weapon: CombatWeapon;
   stance: CombatStance;
@@ -25,6 +43,10 @@ export type CombatState = {
   streak: number;
   bestStreak: number;
   lastLoot: string | null;
+  encounter: CombatEncounter | null;
+  randomSeed: number;
+  nextHitId: number;
+  hits: CombatHit[];
 };
 
 export type GameState = {
@@ -179,7 +201,7 @@ export function defaultGameState(): GameState {
     retreatAt: 25,
     equippedGear: null,
     statusEffects: [],
-    combat: { weapon: "laser", stance: "balanced", activeTaskId: null, progress: 0, victories: {}, streak: 0, bestStreak: 0, lastLoot: null },
+    combat: { weapon: "laser", stance: "balanced", activeTaskId: null, progress: 0, victories: {}, streak: 0, bestStreak: 0, lastLoot: null, encounter: null, randomSeed: 0x9e3779b9, nextHitId: 1, hits: [] },
     storyLog: ["Aethelgard docked at Erebus Station."],
     pendingEvent: null,
   };
@@ -203,6 +225,23 @@ function numericRecord<T extends string>(value: unknown, defaults: Record<T, num
 function looseNumericRecord(value: unknown, max = 10_000_000) {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
   return Object.fromEntries(Object.entries(input).filter(([key]) => key.length < 100).slice(0, 500).map(([key, amount]) => [key, boundedNumber(amount, 0, max)]));
+}
+
+function sanitizeCombatEncounter(value: unknown, activeTaskId: unknown): CombatEncounter | null {
+  if (!value || typeof value !== "object") return null;
+  const encounter = value as Record<string, unknown>;
+  if (typeof encounter.targetId !== "string" || encounter.targetId !== activeTaskId || encounter.targetId.length > 80) return null;
+  const boundedSeconds = (seconds: unknown, fallback: number, maximum = 60) => typeof seconds === "number" && Number.isFinite(seconds)
+    ? Math.max(0, Math.min(maximum, seconds)) : fallback;
+  return {
+    targetId: encounter.targetId,
+    enemyHull: boundedNumber(encounter.enemyHull, 1, 1_000_000),
+    enemyShields: boundedNumber(encounter.enemyShields, 0, 1_000_000),
+    playerCooldown: boundedSeconds(encounter.playerCooldown, 1),
+    enemyCooldown: boundedSeconds(encounter.enemyCooldown, 2.8),
+    spawnDelay: boundedSeconds(encounter.spawnDelay, 0, 5),
+    suppliesPaid: encounter.suppliesPaid === true,
+  };
 }
 
 export function sanitizeGameState(value: unknown): GameState {
@@ -307,6 +346,10 @@ export function sanitizeGameState(value: unknown): GameState {
       streak: boundedNumber(combatInput.streak, 0, 10_000_000),
       bestStreak: boundedNumber(combatInput.bestStreak, 0, 10_000_000),
       lastLoot: typeof combatInput.lastLoot === "string" ? combatInput.lastLoot.slice(0, 120) : null,
+      encounter: sanitizeCombatEncounter(combatInput.encounter, combatInput.activeTaskId),
+      randomSeed: Math.max(1, boundedNumber(combatInput.randomSeed, defaults.combat.randomSeed, 0xffffffff)),
+      nextHitId: Math.max(1, boundedNumber(combatInput.nextHitId, 1, Number.MAX_SAFE_INTEGER)),
+      hits: [], // Hitsplats are transient visual events; never replay them after loading a save.
     },
     storyLog: stringList(input.storyLog, 30).length ? stringList(input.storyLog, 30) : defaults.storyLog,
     pendingEvent: typeof input.pendingEvent === "string" ? input.pendingEvent.slice(0, 60) : null,
