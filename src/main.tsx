@@ -1,9 +1,9 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import Home from "../app/page";
-import { GameShell } from "../app/game-shell";
-import { defaultGameState } from "../lib/game-state";
-import "../app/globals.css";
+import Home from "./pages/Home";
+import { GameShell } from "./game/GameShell";
+import { defaultGameState } from "./lib/game-state";
+import "./styles/globals.css";
 
 function App() {
   const [route, setRoute] = useState(window.location.hash);

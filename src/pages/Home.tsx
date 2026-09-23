@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-html-link-for-pages */
 import { ArrowRight, Crosshair, Orbit, Rocket, ShieldCheck, Sparkles, Telescope, Users, Wrench } from "lucide-react";
 
 const sectors = [

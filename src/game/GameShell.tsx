@@ -1,12 +1,9 @@
-"use client";
-/* eslint-disable @next/next/no-html-link-for-pages */
-
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   Activity, ArrowDownRight, ArrowUpRight, Atom, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
   CircleGauge, Cloud, Coins, Compass, Crosshair, Dna, FlaskConical, Gem,
   Hammer, HeartPulse, History, Landmark, LockKeyhole, Map, Medal, Orbit,
-  Menu, PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Search, Shield,
+  Menu, PackageOpen, Pickaxe, Radio, Recycle, Rocket, ScrollText, Shield,
   ShieldCheck, Sparkles, Star, Target, Telescope, TrendingUp, Trophy,
   UserRound, Users, Wrench, X, Zap,
 } from "lucide-react";
@@ -18,6 +15,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   activities, collectionEntries, contracts, crew, droneSpecs, equipmentSpecs,
   expeditions, itemNames, researchNodes, sectors, shipModules, skillMeta, vehicleSpecs,
   storyEvents, totalLevel, type Activity as SkillActivity,
@@ -27,12 +29,6 @@ import {
   MAX_SKILL_LEVEL, SKILL_IDS, defaultGameState, levelFromXp, sanitizeGameState, xpForLevel,
   type CombatStance, type CombatWeapon, type DroneId, type EquipmentId, type GameState, type OutpostType, type PowerMode, type ResearchPath, type ShipModuleId, type SkillId, type StatusEffect, type VehicleId,
 } from "@/lib/game-state";
-
-declare global {
-  interface Document {
-    modelContext?: { registerTool: (tool: Record<string, unknown>, options?: { signal?: AbortSignal }) => void | Promise<void> };
-  }
-}
 
 type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
@@ -576,26 +572,6 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
   const stopCombat = useCallback(() => updateState((entry) => ({ ...entry, combat: { ...entry.combat, activeTaskId: null, progress: 0 }, lastActiveAt: Date.now() })), [updateState]);
 
-  useEffect(() => {
-    const context = document.modelContext;
-    if (!context?.registerTool) return;
-    const lifecycle = new AbortController();
-    try {
-      void Promise.resolve(context.registerTool({
-        name: "start_training", title: "Start skill training", description: "Start an unlocked Starfall Idle activity.",
-        inputSchema: { type: "object", properties: { activityId: { type: "string", enum: activities.filter((entry) => entry.skillId !== "combat").map((entry) => entry.id) } }, required: ["activityId"], additionalProperties: false },
-        annotations: { readOnlyHint: false, untrustedContentHint: false },
-        execute(input: unknown) {
-          const activity = activityById[(input as { activityId?: string }).activityId ?? ""];
-          if (!activity || activity.skillId === "combat") throw new Error("Unknown skill activity.");
-          startActivity(activity);
-          return { selected: activity.name };
-        },
-      }, { signal: lifecycle.signal })).catch(() => undefined);
-    } catch {}
-    return () => lifecycle.abort();
-  }, [startActivity]);
-
   const active = activityById[state.activeTask.activityId] ?? activities[0];
   const activeSkill = state.skills[active.skillId];
   const activeSector = sectorById[state.sectorId] ?? sectors[0];
@@ -1117,146 +1093,6 @@ function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: 
 function PatrolView({ state, onNewPatrol }: { state: GameState; onNewPatrol: () => void }) {
   const ready = totalLevel(state) >= 350 && state.completedExpeditions >= 3 && (state.combat.victories["boss-corsair-carrier"] ?? 0) >= 1;
   return <><div className="patrol-hero panel"><Medal /><div><p className="eyebrow">COMMISSION {String(state.patrol).padStart(2, "0")}</p><h2>{state.commandPoints} Command Points</h2><p>New commissions retain veteran progress and start the next patrol with a command cache. The first reset is now intended as a mid-game milestone, not an endgame wall.</p></div><AlertDialog><AlertDialogTrigger asChild><Button disabled={!ready}>Begin new patrol</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>End the current patrol?</AlertDialogTitle><AlertDialogDescription>You keep research, discoveries, operation mastery, crew progression, unique boss gear and Command Points. The next commission starts with 300 credits plus 100 per completed patrol, rations, medkits, fuel rods, power cells, and 3 new Command Points.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep patrolling</AlertDialogCancel><AlertDialogAction onClick={onNewPatrol}>Begin new commission</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div><div className="record-grid"><section className="panel"><h2>Reset perks</h2><div className="earned"><Sparkles /><span>+3 Command Points, plus mission bonus points</span></div><div className="earned"><Coins /><span>Commission cache: credits, 12 rations, 6 medkits, 3 fuel rods and 4 power cells</span></div><div className="earned"><Cloud /><span>Each patrol extends the offline cap by 2 hours</span></div><div className="earned"><Users /><span>Veteran crew, research, mastery, discoveries and unique gear remain</span></div></section><section className="panel"><h2>Patrol requirements</h2><div className={totalLevel(state) >= 350 ? "earned" : ""}><Check /><span>Total level 350 ({totalLevel(state)} / 350)</span></div><div className={state.completedExpeditions >= 3 ? "earned" : ""}><Check /><span>Complete 3 expeditions ({state.completedExpeditions} / 3)</span></div><div className={(state.combat.victories["boss-corsair-carrier"] ?? 0) >= 1 ? "earned" : ""}><Check /><span>Defeat the Corsair Carrier</span></div><div><History /><span>{state.totalActions.toLocaleString()} lifetime actions this patrol</span></div></section><section className="panel log-record"><h2>Captain&apos;s log</h2>{state.storyLog.slice(0, 30).map((entry, index) => <p key={index}>{entry}</p>)}</section></div></>;
-}
-
-type HiscoreScope = "all" | "patrol" | "weekly";
-type HiscoreCategory = "overall" | SkillId;
-type HiscoreRow = { rank: number; displayName: string; level: number; xp: number };
-type HiscoreRecord = {
-  display_name: string;
-  total_level: number;
-  all_time_xp: number;
-  boss_victories: number;
-  missions_completed: number;
-  expeditions_completed: number;
-  patrol_commissions: number;
-  operations_mastered: number;
-  best_combat_streak: number;
-};
-type HiscoreResponse = {
-  rows: HiscoreRow[];
-  total: number;
-  page: number;
-  pages: number;
-  player: HiscoreRow | null;
-  record: HiscoreRecord | null;
-};
-
-const hiscoreScopes: { id: HiscoreScope; label: string; detail: string }[] = [
-  { id: "all", label: "All Time", detail: "Lifetime XP retained across patrol commissions" },
-  { id: "patrol", label: "Current Patrol", detail: "Progress earned during the active commission" },
-  { id: "weekly", label: "Weekly", detail: "XP gained since Monday at 00:00 UTC" },
-];
-
-function HiscoresView({ signedIn, signInPath }: { signedIn: boolean; signInPath: string }) {
-  const [category, setCategory] = useState<HiscoreCategory>("overall");
-  const [scope, setScope] = useState<HiscoreScope>("all");
-  const [page, setPage] = useState(1);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [data, setData] = useState<HiscoreResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [reload, setReload] = useState(0);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const params = new URLSearchParams({ category, scope, page: String(page) });
-    if (search) params.set("search", search);
-    fetch(`/api/hiscores?${params}`, { signal: controller.signal, cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null) as { error?: string } | null;
-          throw new Error(payload?.error ?? "Unable to load rankings");
-        }
-        return response.json() as Promise<HiscoreResponse>;
-      })
-      .then((result) => { setData(result); setLoading(false); })
-      .catch((reason: Error) => {
-        if (reason.name === "AbortError") return;
-        setError(reason.message);
-        setLoading(false);
-      });
-    return () => controller.abort();
-  }, [category, page, reload, scope, search]);
-
-  const beginLoad = () => { setLoading(true); setError(""); };
-  const chooseCategory = (next: HiscoreCategory) => { beginLoad(); setCategory(next); setPage(1); };
-  const chooseScope = (next: HiscoreScope) => { beginLoad(); setScope(next); setPage(1); };
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    beginLoad();
-    setSearch(searchInput.trim().slice(0, 32));
-    setPage(1);
-  };
-  const changePage = (next: number) => { beginLoad(); setPage(next); };
-  const categoryName = category === "overall" ? "Overall" : skillMeta[category].name;
-  const recordRows = data?.record ? [
-    ["Boss victories", data.record.boss_victories, Crosshair],
-    ["Missions completed", data.record.missions_completed, ScrollText],
-    ["Expeditions completed", data.record.expeditions_completed, Compass],
-    ["Patrol commissions", data.record.patrol_commissions, Medal],
-    ["Operations mastered", data.record.operations_mastered, Check],
-    ["Best combat streak", data.record.best_combat_streak, Zap],
-  ] as const : [];
-
-  return <div className="hiscores-layout">
-    <aside className="hiscore-categories panel">
-      <form className="hiscore-search" onSubmit={submitSearch}>
-        <label htmlFor="commander-search">Find a commander</label>
-        <div><Search /><Input id="commander-search" value={searchInput} maxLength={32} onChange={(event) => setSearchInput(event.target.value)} placeholder="Commander name" /><Button type="submit">Search</Button></div>
-        {search ? <button type="button" className="clear-ranking-search" onClick={() => { beginLoad(); setSearchInput(""); setSearch(""); setPage(1); }}>Clear search for “{search}”</button> : null}
-      </form>
-      <div className="hiscore-category-list" aria-label="Ranking category">
-        <button className={category === "overall" ? "selected" : ""} onClick={() => chooseCategory("overall")}><Trophy /><span><strong>Overall</strong><small>All fourteen skills</small></span><ChevronRight /></button>
-        {SKILL_IDS.map((id) => { const Icon = skillIcons[id]; return <button key={id} className={category === id ? "selected" : ""} onClick={() => chooseCategory(id)}><Icon /><span><strong>{skillMeta[id].name}</strong><small>Level and experience</small></span><ChevronRight /></button>; })}
-      </div>
-    </aside>
-
-    <section className="hiscore-board panel" aria-busy={loading}>
-      <header className="hiscore-board-head">
-        <div><p className="eyebrow">VERIFIED COMMANDER RANKINGS</p><h2>{categoryName} Hiscores</h2><p>{hiscoreScopes.find((entry) => entry.id === scope)?.detail}</p></div>
-        <span>{data?.total ?? 0} ranked</span>
-      </header>
-      <div className="hiscore-tabs" role="group" aria-label="Ranking period">
-        {hiscoreScopes.map((entry) => <button key={entry.id} aria-pressed={scope === entry.id} className={scope === entry.id ? "selected" : ""} onClick={() => chooseScope(entry.id)}>{entry.label}</button>)}
-      </div>
-
-      <div className="hiscore-table-wrap">
-        <table className="hiscore-table">
-          <thead><tr><th>Rank</th><th>Commander</th><th>{category === "overall" ? "Total level" : "Level"}</th><th>{scope === "weekly" ? "XP gained" : "Total XP"}</th></tr></thead>
-          <tbody>
-            {loading ? Array.from({ length: 6 }, (_, index) => <tr key={index} className="hiscore-loading"><td colSpan={4}><span /></td></tr>) : null}
-            {!loading && error ? <tr><td colSpan={4} className="hiscore-empty"><Radio />{error}<Button variant="outline" onClick={() => { beginLoad(); setReload((value) => value + 1); }}>Retry</Button></td></tr> : null}
-            {!loading && !error && !data?.rows.length ? <tr><td colSpan={4} className="hiscore-empty"><Trophy /><strong>No commanders found</strong><span>{search ? "Try another commander name." : "The first signed-in cloud save will establish this ranking."}</span></td></tr> : null}
-            {!loading && !error ? data?.rows.map((row) => <tr key={`${row.rank}-${row.displayName}`} className={`${row.rank <= 3 ? `podium rank-${row.rank}` : ""} ${data.player?.rank === row.rank && data.player.displayName === row.displayName ? "player-row" : ""}`}><td><span className="rank-value">{row.rank <= 3 ? <Medal /> : null}{row.rank.toLocaleString()}</span></td><td><strong>{row.displayName}</strong>{data.player?.rank === row.rank && data.player.displayName === row.displayName ? <small>YOU</small> : null}</td><td>{fmt(row.level)}</td><td>{fmt(row.xp)}</td></tr>) : null}
-          </tbody>
-        </table>
-      </div>
-
-      <footer className="hiscore-pagination">
-        <Button variant="outline" disabled={page <= 1 || loading} onClick={() => changePage(Math.max(1, page - 1))}><ChevronLeft /> Previous</Button>
-        <span>Page <strong>{data?.page ?? page}</strong> of <strong>{data?.pages ?? 1}</strong></span>
-        <Button variant="outline" disabled={page >= (data?.pages ?? 1) || loading} onClick={() => changePage(page + 1)}>Next <ChevronRight /></Button>
-      </footer>
-    </section>
-
-    <aside className="hiscore-personal">
-      <section className="personal-rank panel">
-        <p className="eyebrow">YOUR RECORD</p>
-        {signedIn && data?.player ? <><div className="personal-rank-number"><Medal /><span>Rank</span><strong>#{fmt(data.player.rank)}</strong></div><h3>{data.player.displayName}</h3><div className="personal-rank-stats"><span>{category === "overall" ? "Total level" : `${categoryName} level`}<b>{fmt(data.player.level)}</b></span><span>{scope === "weekly" ? "XP gained" : "Experience"}<b>{fmt(data.player.xp)}</b></span></div></> : null}
-        {signedIn && !loading && !data?.player ? <div className="personal-rank-empty"><Cloud /><strong>Awaiting cloud save</strong><span>Your commander will enter the rankings after the next successful save.</span></div> : null}
-        {!signedIn ? <div className="personal-rank-empty"><ShieldCheck /><strong>Verify your commander</strong><span>Sign in to join the Hiscores and see your personal rank.</span><a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a></div> : null}
-      </section>
-
-      <section className="fleet-records panel">
-        <div><p className="eyebrow">OTHER HISCORES</p><h3>Patrol record</h3></div>
-        {recordRows.length ? recordRows.map(([label, value, Icon]) => <div key={label}><Icon /><span>{label}</span><strong>{fmt(value)}</strong></div>) : <p className="fleet-records-placeholder">Sign in and save progress to reveal your verified records.</p>}
-      </section>
-
-      <p className="hiscore-integrity"><ShieldCheck /> Only signed-in cloud saves enter the rankings. Updates are verified and written by the server.</p>
-    </aside>
-  </div>;
 }
 
 function CharacterView({ state, fallbackName, onSaveName }: { state: GameState; fallbackName: string; onSaveName: (name: string) => void }) {

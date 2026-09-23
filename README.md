@@ -35,7 +35,6 @@ pnpm build
 
 Starfall Idle is a static, browser-only app. Progress is saved in `localStorage` under `starfall-idle-save-v5`, and offline progression is calculated when the game opens. Saves are specific to a browser profile and are not shared between devices.
 
-The legacy ChatGPT Sites/D1 source remains in the repository as an unused migration reference; it is not part of the Vite build or the GitHub Pages artifact.
 
 ## Stack
 
