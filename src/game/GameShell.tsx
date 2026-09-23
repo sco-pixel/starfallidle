@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
   Activity, ArrowDownRight, ArrowUpRight, Biohazard, Bot, Boxes, BrainCircuit, Check, ChevronLeft, ChevronRight,
   Cloud, Coins, Compass, Crosshair, Dna, FlaskConical,
@@ -25,6 +25,7 @@ import {
   type CombatStance, type CombatWeapon, type DroneId, type EquipmentId, type GameState, type OutpostType, type PowerMode, type ShipModuleId, type SkillId, type StatusEffect, type VehicleId,
 } from "@/lib/game-state";
 import { Sprite } from "@/components/game/Sprite";
+import { CombatSprite } from "@/components/game/CombatSprite";
 
 type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "character" | "outposts";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
@@ -267,6 +268,12 @@ function operationPauseReasons(state: GameState, activity: SkillActivity) {
   }
   return reasons;
 }
+function bestRepairActivity(state: GameState) {
+  return ["reactor-grid-repair", "armour-plating-repair", "hull-repair"]
+    .map((id) => activityById[id])
+    .find((activity) => operationPauseReasons(state, activity).length === 0);
+}
+
 function missionReady(state: GameState, id: string) {
   switch (id) {
     case "signal-in-static": return state.collection.length >= 12 && state.skills.science.level >= 15;
@@ -299,7 +306,10 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
   const damage = combatDamage(state, activity);
   if (damage) {
     const safeHull = state.maxHull * (state.retreatAt / 100);
-    count = Math.min(count, Math.max(0, Math.floor((state.hull - safeHull + state.shields) / damage)));
+    // An encounter may cross the retreat threshold; the next one must then pause.
+    // Match operationPauseReasons: shields can still protect a hull already at the threshold.
+    const endurance = Math.max(0, state.hull - safeHull) + state.shields;
+    count = Math.min(count, Math.ceil(endurance / damage));
   }
   if (!count || !activityAvailable(state, activity)) return { state, count: 0 };
 
@@ -549,6 +559,13 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     setView("skills");
   }, [updateState]);
 
+  const startBestRepair = useCallback(() => {
+    const repair = bestRepairActivity(stateRef.current);
+    if (!repair || stateRef.current.activeTask.activityId === repair.id) return;
+    updateState((entry) => ({ ...entry, activeTask: { skillId: "engineering", activityId: repair.id }, progress: 0, lastActiveAt: Date.now() }));
+    setSelectedSkill("engineering");
+  }, [updateState]);
+
   const startCombat = useCallback((activity: SkillActivity) => {
     const current = stateRef.current;
     if (activity.skillId !== "combat" || operationPauseReasons(current, activity).length) return;
@@ -728,7 +745,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     sectors: ["Star Chart", "Travel changes available resources, enemies and discoveries"],
     ship: ["Aethelgard Cruiser", "Four decks, nine upgradeable ship systems"],
     crew: ["Crew Roster", "Assign ten specialists to support the skills you value"],
-    combat: ["Combat Doctrine", "Balance weapons, protection and automatic retreat"],
+    combat: ["Combat", ""],
     expeditions: ["Expeditions", "Prepare supplies and send teams on longer operations"],
     directives: ["Directive Board", "Active contracts, sector objectives and long-form missions in one place"],
     research: ["Research Network", "Turn discoveries into permanent technical advantages"],
@@ -767,7 +784,6 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
       <main className="play-column">
         {offlineReport ? <div className="offline-report panel"><Cloud /><div><strong>Offline progress report · {duration(offlineReport.seconds)}</strong><span>{offlineReport.activity} · {offlineReport.actions} actions · +{offlineReport.xp} XP · {itemsText(offlineReport.gains)}</span></div><button onClick={() => setOfflineReport(null)}>×</button></div> : null}
-        {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
         {view === "skills" ? <section className="active-operation panel">
           <div className="operation-mark"><Sprite kind="operation" id={active.id} label={`${active.name} operation sprite`} className="active-operation-sprite" decorative /></div>
           <div className="operation-body">
@@ -777,14 +793,14 @@ export function GameShell({ initialState }: { initialState: GameState }) {
           </div>
         </section> : null}
 
-        <header className="content-heading v3-heading"><div><p className="eyebrow">{view === "skills" ? skillMeta[selectedSkill].group.toUpperCase() + " SKILL" : "COMMAND CONSOLE"}</p><h1>{viewTitle[view][0]}</h1><p>{viewTitle[view][1]}</p></div>{view === "skills" ? <div className="xp-block"><strong>Level {state.skills[selectedSkill].level}</strong><span>{fmt(state.skills[selectedSkill].xp)} XP · {fmt(state.mastery[selectedSkill])} mastery</span><Progress value={xpProgress} /></div> : null}</header>
+        <header className={`content-heading v3-heading${view === "combat" ? " combat-heading" : ""}`}><div><p className="eyebrow">{view === "skills" ? skillMeta[selectedSkill].group.toUpperCase() + " SKILL" : view === "combat" ? "COMBAT CONSOLE" : "COMMAND CONSOLE"}</p><h1>{viewTitle[view][0]}</h1>{viewTitle[view][1] ? <p>{viewTitle[view][1]}</p> : null}</div>{view === "skills" ? <div className="xp-block"><strong>Level {state.skills[selectedSkill].level}</strong><span>{fmt(state.skills[selectedSkill].xp)} XP · {fmt(state.mastery[selectedSkill])} mastery</span><Progress value={xpProgress} /></div> : null}</header>
 
         {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
         {view === "sectors" ? <SectorView state={state} onTravel={travel} /> : null}
         {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onUpgradeEquipment={upgradeEquipment} onEquip={equipUniqueGear} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
         {view === "crew" ? <CrewView state={state} onAssign={assignCrew} /> : null}
-        {view === "combat" ? <CombatView state={state} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={() => startActivity(activityById["hull-repair"])} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onClearEffect={clearStatusEffect} /> : null}
+        {view === "combat" ? <CombatView state={state} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={startBestRepair} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onClearEffect={clearStatusEffect} /> : null}
         {view === "expeditions" ? <ExpeditionView state={state} now={now} onLaunch={launchExpedition} /> : null}
         {view === "directives" ? <DirectiveView state={state} onCompleteContract={completeContract} onAlly={formAlliance} onClaimObjective={claimObjective} onClaimMission={claimMission} /> : null}
         {view === "research" ? <ResearchView state={state} onUnlock={unlockResearch} /> : null}
@@ -797,6 +813,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
       <aside className="status-column v3-status">
         <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} /><Stat icon={Medal} label="Achievements" value={state.achievements.length} /><Stat icon={Trophy} label="Mastered" value={Object.values(state.operationMastery).filter((mastery) => mastery >= 100).length} /></div>
         <div className="vitals panel"><div><span>Hull</span><strong>{state.hull} / {state.maxHull}</strong></div><Progress value={state.hull / state.maxHull * 100} /><div><span>Shields</span><strong>{state.shields}</strong></div><Progress value={Math.min(100, state.shields)} /><div><span>Crew morale</span><strong>{state.crewMorale}%</strong></div><Progress value={state.crewMorale} /></div>
+        {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
         <div className="side-nav panel">
           {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
         </div>
@@ -910,6 +927,16 @@ function DroneView({ state, onBuild, onBuildVehicle }: { state: GameState; onBui
   return <><div className="section-label"><p className="eyebrow">AUTONOMOUS CRAFT</p><h2>Drone Swarms</h2></div><div className="module-grid">{(Object.entries(droneSpecs) as [DroneId, typeof droneSpecs[DroneId]][]).map(([id, drone]) => { const missing = moduleMissing(state, drone.cost); return <article key={id} className="module-card panel"><span><Bot /></span><div><p className="eyebrow">ACTIVE UNITS · {state.drones[id]}</p><h3>{drone.name}</h3><p>{drone.description}</p><small>Current bonus: {drone.effect(state.drones[id])}</small><small>Fabrication cost: {itemsText(drone.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuild(id)}>{missing.length ? "Requirements unmet" : "Fabricate"}</Button></article>; })}</div><div className="section-label"><p className="eyebrow">HANGAR VEHICLES</p><h2>Surface & Boarding Craft</h2></div><div className="module-grid">{(Object.entries(vehicleSpecs) as [VehicleId, typeof vehicleSpecs[VehicleId]][]).map(([id, vehicle]) => { const missing = moduleMissing(state, vehicle.cost); return <article key={id} className="module-card panel"><span><Rocket /></span><div><p className="eyebrow">READY · {state.vehicles[id]}</p><h3>{vehicle.name}</h3><p>{vehicle.description}</p><small>Current bonus: {vehicle.effect(state.vehicles[id])}</small><small>Construction cost: {itemsText(vehicle.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuildVehicle(id)}>{missing.length ? "Requirements unmet" : "Construct"}</Button></article>; })}</div></>;
 }
 
+function victoriesUntilRareSalvage(victories: number, mastery: number, rareEvery: number) {
+  // Each victory increases mastery before the engine checks that victory's rare interval.
+  // The interval change can skip the old milestone, so allow one full interval on either side.
+  for (let next = 1; next <= Math.max(2, rareEvery) * 2; next += 1) {
+    const interval = Math.max(2, rareEvery - (mastery + next >= 100 ? Math.ceil(rareEvery * 0.1) : 0));
+    if (Math.floor((victories + next) / interval) > Math.floor((victories + next - 1) / interval)) return next;
+  }
+  return Math.max(2, rareEvery);
+}
+
 function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, onClearEffect }: { state: GameState; onRetreat: (value: number) => void; onRepair: () => void; onDoctrine: (weapon?: CombatWeapon, stance?: CombatStance) => void; onEngage: (activity: SkillActivity) => void; onStop: () => void; onClearEffect: (effect: StatusEffect) => void }) {
   const [sectorOnly, setSectorOnly] = useState(true);
   const targets = activities.filter((entry) => entry.skillId === "combat" && entry.enemy);
@@ -918,6 +945,12 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
   const activeTarget = activeCandidate?.skillId === "combat" ? activeCandidate : null;
   const combatPauseReasons = activeTarget ? operationPauseReasons(state, activeTarget) : [];
   const combatPaused = combatPauseReasons.length > 0;
+  const previewTarget = activeTarget ?? activityById["scavenger-drone"];
+  const previewEnemy = previewTarget.enemy!;
+  const previewMatchup = combatMatchup(state, previewTarget);
+  const combatState = activeTarget ? combatPaused ? "paused" : "running" : "standby";
+  const repairActivity = bestRepairActivity(state);
+  const repairing = Boolean(repairActivity && state.activeTask.activityId === repairActivity.id);
   const bossPhase = activeTarget?.enemy?.class.includes("Boss") ? state.combat.progress < 34 ? "Phase 1 · screening defences" : state.combat.progress < 67 ? "Phase 2 · weapons response" : "Phase 3 · final countermeasure" : null;
   const totalVictories = Object.values(state.combat.victories).reduce((a, b) => a + b, 0);
   const milestones = [
@@ -925,49 +958,82 @@ function CombatView({ state, onRetreat, onRepair, onDoctrine, onEngage, onStop, 
     [15, "Emergency Bulkheads", "10% less incoming damage"], [20, "Bounty Protocol", "+20% combat credits"],
   ] as const;
   return <>
-    <div className="combat-summary panel">
+    <div className="combat-console"><div className="combat-summary panel">
       <div><Shield /><span>Hull integrity</span><strong>{state.hull} / {state.maxHull}</strong></div>
-      <div><Zap /><span>Deflector charge</span><strong>{state.shields}</strong></div>
-      <div><Crosshair /><span>Victory streak</span><strong>{state.combat.streak} · best {state.combat.bestStreak}</strong></div>
-      <div><Target /><span>Total victories</span><strong>{totalVictories}</strong></div>
+      <div><Zap /><span>Shields</span><strong>{state.shields}</strong></div>
       <div><Rocket /><span>Missile magazine</span><strong>{state.inventory.missiles ?? 0}</strong></div>
-      <div><Sparkles /><span>Last rare salvage</span><strong>{state.combat.lastLoot ?? "None recovered"}</strong></div>
     </div>
-    <section className={`combat-operation panel ${activeTarget ? "active" : ""}`}>
-      <div><p className="eyebrow">VESSEL COMBAT · LEVEL {state.skills.combat.level} · {fmt(state.skills.combat.xp)} XP · RUNS IN PARALLEL</p><h2>{activeTarget ? `Engaging ${activeTarget.name}` : "No hostile target selected"}</h2><p>{activeTarget ? `Combat continues while ${skillMeta[state.activeTask.skillId].name} trains independently.` : "Choose a target below. Your Skill Matrix activity will continue uninterrupted."}</p></div>
-      <Progress value={activeTarget ? state.combat.progress : 0} />
-      <strong>{activeTarget ? combatPaused ? `Paused · ${combatPauseReasons.join(" · ")}` : `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s encounter${bossPhase ? ` · ${bossPhase}` : ""}` : "Fire control standing by"}</strong>
-      {activeTarget ? <Button variant="outline" onClick={onStop}>Disengage</Button> : null}
-    </section>
+    <div className="combat-workspace">
+      <section className="combat-battle panel" aria-label="Vessel combat">
+        <div className="combat-stage-heading"><div><p className="eyebrow">VESSEL COMBAT · LEVEL {state.skills.combat.level} · {fmt(state.skills.combat.xp)} XP</p><h2>{activeTarget ? activeTarget.name : "Fire control standing by"}</h2></div><span className={`combat-stage-status is-${combatState}`}>{combatState === "running" ? "Engaging" : combatState === "paused" ? "Paused" : "Standby"}</span></div>
+        <div className={`combat-stage is-${combatState} weapon-${state.combat.weapon}`} style={{ "--encounter-duration": `${actionSeconds(state, previewTarget)}s` } as CSSProperties}>
+          <CombatSprite id="asteroid" label="" className="combat-asteroid combat-asteroid-one" decorative />
+          <CombatSprite id="asteroid" label="" className="combat-asteroid combat-asteroid-two" decorative />
+          <CombatSprite id="asteroid" label="" className="combat-asteroid combat-asteroid-three" decorative />
+          <div className="combat-vessel combat-vessel-player">
+            <div className="combat-vessel-art"><span className="combat-thruster" aria-hidden="true" /><CombatSprite id="aethelgard" label="Aethelgard" className="combat-ship-sprite" decorative loading="eager" />{state.shields > 0 ? <span className="combat-shield" aria-hidden="true" /> : null}</div>
+            <div className="combat-vessel-label"><strong>Aethelgard</strong><span>{weaponNames[state.combat.weapon]} · {stanceNames[state.combat.stance]}</span></div>
+          </div>
+          <span className="combat-shot" aria-hidden="true" /><span className="combat-shot combat-shot-enemy" aria-hidden="true" />
+          <div className="combat-vessel combat-vessel-enemy">
+            <div className="combat-vessel-art"><CombatSprite id={previewTarget.id} label={previewTarget.name} className="combat-ship-sprite" decorative loading="eager" /></div>
+            <div className="combat-vessel-label"><strong>{previewTarget.name}</strong><span>{activeTarget ? `${previewEnemy.class} · Level ${previewTarget.level}` : "Preview · select Engage below"}</span></div>
+          </div>
+        </div>
+        <div className="combat-encounter">
+          <div className="combat-encounter-copy"><span>{activeTarget ? combatPaused ? "Encounter paused" : "Encounter progress" : "Awaiting engagement"}</span><strong>{activeTarget ? `${Math.floor(state.combat.progress)}% · ${actionSeconds(state, activeTarget).toFixed(1)}s / encounter` : "No target engaged"}</strong></div>
+          <Progress aria-label="Encounter progress" value={activeTarget ? state.combat.progress : 0} />
+          {combatPaused ? <p className="combat-unavailable" role="status">{combatPauseReasons.join(" · ")}</p> : activeTarget ? bossPhase ? <p>{bossPhase}</p> : null : <p>Choose a target below to begin. Each completed encounter awards a victory.</p>}
+          {activeTarget ? <Button variant="outline" onClick={onStop}>Disengage</Button> : null}
+        </div>
+        <div className="combat-matchup"><span className={previewMatchup.weakness ? "advantage" : ""}>{previewMatchup.weakness ? "Weakness exploited" : `Weak to ${weaponNames[previewEnemy.weakness]}`}</span><span>{previewMatchup.hitChance}% hit chance</span><span>{combatDamage(state, previewTarget)} incoming / encounter</span></div>
+      </section>
     <section className="combat-control panel">
-      <div><p className="eyebrow">FIRE CONTROL</p><h2>Combat doctrine</h2><p>Match your weapon to enemy defences. Guided missiles consume one missile per victory.</p></div>
+      <div className="combat-control-heading"><p className="eyebrow">FIRE CONTROL</p><h2>Combat doctrine</h2><p>Match weapons to enemy defences. Guided missiles use one missile per victory.</p></div>
       <label><span>Weapon system</span><Select value={state.combat.weapon} onValueChange={(value) => onDoctrine(value as CombatWeapon)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(weaponNames).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></label>
       <label><span>Engagement stance</span><Select value={state.combat.stance} onValueChange={(value) => onDoctrine(undefined, value as CombatStance)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(stanceNames).map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}</SelectContent></Select></label>
       <label className="retreat-control"><span>Auto-retreat at {state.retreatAt}% hull</span><Slider value={[state.retreatAt]} min={10} max={75} step={5} onValueChange={(value) => onRetreat(value[0])} /></label>
-      <Button onClick={onRepair}><Wrench /> Repair & reset streak</Button>
+      <div className="combat-repair"><Button onClick={onRepair} disabled={!repairActivity || repairing}><Wrench /> {repairing ? "Repairing hull" : "Repair hull"}</Button><small>{repairActivity ? `${repairing ? "Training" : "Switch training to"} ${repairActivity.name}` : "No repair supplies available. Gather Salvage to repair hull."}</small></div>
     </section>
+    </div>
     {state.statusEffects.length ? <section className="depth-panel panel"><div><p className="eyebrow">SHIP CONDITIONS</p><h2>Persistent battle damage</h2><p>Conditions remain after combat until treated here or cleared by their related skill.</p></div><div className="effect-grid">{state.statusEffects.map((effect) => <article key={effect}><strong>{effect.replace(/([A-Z])/g, " $1")}</strong><span>{effect === "radiation" ? "Operations 5% slower · clear with 2 Medkits or Medicine" : effect === "hullBreach" ? "Incoming damage +18% · clear with 5 Salvage or Engineering" : effect === "sensorDisruption" ? "Combat accuracy −8% · clear with 5 Data or Science" : "Operations 10% slower · clear with 2 Power Cells or Metallurgy"}</span><Button variant="outline" onClick={() => onClearEffect(effect)}>Treat</Button></article>)}</div></section> : null}
-    <div className="section-label combat-roster-heading"><div><p className="eyebrow">HOSTILE CONTACTS</p><h2>Target roster</h2><span>Target cards always show the next actionable requirement.</span></div><label className="target-sector-toggle"><input type="checkbox" checked={sectorOnly} onChange={(event) => setSectorOnly(event.target.checked)} /> Show only enemies in this sector</label></div>
-    <div className="combat-targets">{[...visibleTargets].sort((a, b) => a.level - b.level).map((target) => {
+    <section className="combat-roster panel">
+    <div className="section-label combat-roster-heading"><div><p className="eyebrow">HOSTILE CONTACTS</p><h2>Target roster</h2></div><label className="target-sector-toggle"><input type="checkbox" checked={sectorOnly} onChange={(event) => setSectorOnly(event.target.checked)} /> This sector only</label></div>
+    <div className="combat-target-list">{[...visibleTargets].sort((a, b) => a.level - b.level).map((target) => {
       const enemy = target.enemy!;
       const unavailableReasons = operationPauseReasons(state, target);
       const available = unavailableReasons.length === 0;
       const matchup = combatMatchup(state, target);
       const active = state.combat.activeTaskId === target.id;
       const victories = state.combat.victories[target.id] ?? 0;
-      const rareIn = enemy.rareEvery - victories % enemy.rareEvery;
-      return <article key={target.id} className={`combat-target panel ${active ? "active" : ""} ${available ? "available" : "unavailable"}`}>
-        <div className="target-head"><span><Crosshair /></span><div><p className="eyebrow">{enemy.class.toUpperCase()} · LEVEL {target.level}</p><h3>{target.name}</h3></div><b>{victories} KILLS</b></div>
+      const mastery = state.operationMastery[target.id] ?? 0;
+      const rareInterval = Math.max(2, enemy.rareEvery - (mastery >= 100 ? Math.ceil(enemy.rareEvery * 0.1) : 0));
+      const rareIn = victoriesUntilRareSalvage(victories, mastery, enemy.rareEvery);
+      const rewards = Object.fromEntries(Object.entries(target.produces).filter(([, amount]) => amount > 0));
+      const costs = Object.fromEntries(Object.entries(activityCosts(state, target)).filter(([, amount]) => amount > 0));
+      return <article key={target.id} className={`combat-target-row ${active ? "is-active" : ""} ${available ? "is-ready" : "is-locked"}`}>
+        <div className="combat-target-main">
+          <CombatSprite id={target.id} label={target.name} className="combat-target-sprite" decorative />
+          <div className="combat-target-identity"><p className="eyebrow">{enemy.class.toUpperCase()} · LV {target.level}</p><h3>{target.name}</h3><span>{victories} kills · {mastery} / 100 mastery</span>{!available ? <em className="combat-unavailable">{unavailableReasons[0]}</em> : <em className="combat-ready">{active ? "Current target" : "Ready to engage"}</em>}</div>
+          <div className="combat-target-loot"><strong>{itemsText(rewards)}</strong><span>Rare in {rareIn} {rareIn === 1 ? "victory" : "victories"}</span></div>
+          <Button disabled={!available || active} onClick={() => onEngage(target)}>{active ? combatPaused ? "Paused" : "Engaging" : available ? "Engage" : "Locked"}</Button>
+        </div>
+        <details className="combat-target-details"><summary>Target intelligence <ChevronRight /></summary><div className="combat-target-detail-content">
         <p>{target.description}</p>
         <div className="target-stats"><span>Hull <b>{enemy.hull}</b></span><span>Shield <b>{enemy.shields}</b></span><span>Armor <b>{enemy.armor}</b></span><span>Evasion <b>{enemy.evasion}</b></span></div>
         <div className="matchup-readout"><span className={matchup.weakness ? "advantage" : ""}>{matchup.weakness ? "WEAKNESS EXPLOITED" : `Weak to ${weaponNames[enemy.weakness]}`}</span><span>{matchup.hitChance}% hit · {actionSeconds(state, target).toFixed(1)}s · {combatDamage(state, target)} incoming</span></div>
         <em className="combat-profile">{enemy.weakness === "laser" ? "Shielded profile — pulse lasers break through fastest." : enemy.weakness === "railgun" ? "Armoured profile — railguns resolve it fastest." : "Evasive profile — guided missiles track it fastest."}</em>
-        <small>Standard: {itemsText(target.produces)} · Rare in {rareIn}: {itemsText(enemy.rareDrop)}</small>
-        {!available ? <em className="combat-unavailable">{unavailableReasons[0]}</em> : <em className="combat-ready">Ready to engage</em>}
-        <Button disabled={!available || active} onClick={() => onEngage(target)}>{active ? "Engaging" : available ? "Engage target" : "Requirements unmet"}</Button>
+        <small>Base rewards: {itemsText(rewards)} · {target.credits ?? 0} credits · {target.xp} Combat XP</small>
+        <small>Rare salvage: {itemsText(enemy.rareDrop)} · every {rareInterval} victories · next in {rareIn}</small>
+        <small>Supplies per encounter: {Object.keys(costs).length ? itemsText(costs) : "None"} · Sectors: {target.sectors?.map((id) => sectorById[id]?.name ?? id).join(", ") ?? "All sectors"}</small>
+        {!available ? <div className="combat-unavailable">{unavailableReasons.map((reason) => <p key={reason}>{reason}</p>)}</div> : null}
+        </div></details>
       </article>;
     })}</div>
+    </section>
+    <div className="combat-records panel"><span><Target />Total victories <strong>{fmt(totalVictories)}</strong></span><span><Sparkles />Last rare salvage <strong>{state.combat.lastLoot ?? "None recovered"}</strong></span></div>
     <div className="combat-milestones panel"><div><p className="eyebrow">COMBAT SPECIALISATION</p><h2>Rank perks</h2></div>{milestones.map(([level, name, effect]) => <div key={level} className={state.skills.combat.level >= level ? "unlocked" : ""}><span>LV {level}</span><strong>{name}</strong><small>{effect}</small></div>)}</div>
+    </div>
   </>;
 }
 
