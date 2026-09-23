@@ -1,0 +1,30 @@
+.sprite {
+  --sprite-accent: #9aabbc;
+  width: 2rem;
+  height: 2rem;
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--sprite-accent) 65%, #1b2733);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--sprite-accent) 18%, #101923), #0a1118),
+    repeating-linear-gradient(0deg, transparent 0 3px, #ffffff05 3px 4px);
+  box-shadow: inset 0 0 0 1px #ffffff08;
+}
+
+.sprite img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.sprite-atlas {
+  width: 100%;
+  height: 100%;
+  background-position: calc(var(--sprite-column) * 100% / 7) calc(var(--sprite-row) * 100% / 5);
+  background-size: 800% 600%;
+  image-rendering: pixelated;
+}
+.sprite-fallback { color: var(--sprite-accent); font: 700 .58rem/1 var(--font-mono, monospace); letter-spacing: -.04em; }
+.sprite-ore { --sprite-accent: #d9a849; }
+.sprite-tech { --sprite-accent: #72b5d5; }
+.sprite-bio { --sprite-accent: #78bf85; }
+.sprite-signal { --sprite-accent: #c28ee8; }
+.sprite-command { --sprite-accent: #e18068; }
+.sprite-wealth { --sprite-accent: #f0d26b; }

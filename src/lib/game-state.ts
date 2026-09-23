@@ -14,7 +14,6 @@ export type VehicleId = "rover" | "boardingShuttle";
 export type CombatWeapon = "laser" | "railgun" | "missile";
 export type CombatStance = "balanced" | "aggressive" | "defensive";
 export type PowerMode = "balanced" | "industrial" | "research" | "combat" | "navigation";
-export type ResearchPath = "industrial" | "exploration" | "military" | "xenotechnology";
 export type StatusEffect = "radiation" | "hullBreach" | "sensorDisruption" | "overheating";
 export type OutpostType = "mining" | "research" | "trade";
 export type CombatState = {
@@ -54,7 +53,6 @@ export type GameState = {
   drones: Record<DroneId, number>;
   vehicles: Record<VehicleId, number>;
   researchUnlocked: string[];
-  researchPath: ResearchPath | null;
   collection: string[];
   factions: Record<string, number>;
   contractsCompleted: string[];
@@ -62,8 +60,6 @@ export type GameState = {
   missionsCompleted: string[];
   activeExpedition: { id: string; endsAt: number } | null;
   completedExpeditions: number;
-  patrol: number;
-  commandPoints: number;
   achievements: string[];
   hull: number;
   maxHull: number;
@@ -83,7 +79,7 @@ const startingInventory: Record<string, number> = {
   titanium: 0, phaseCrystal: 0, darkMatter: 0, quantumDust: 0, neutronium: 0,
   quantumCircuit: 0, ancientCore: 0, xenoFiber: 0, neuralGel: 0, quantumParts: 0,
   titaniumPlate: 0, quantumAlloy: 0, neutroniumPlate: 0, singularityCore: 0,
-  genesisCompound: 0, voidData: 0, commandToken: 0,
+  genesisSeed: 0, genesisCompound: 0, voidData: 0, commandToken: 0,
   phaseFilament: 0, bioLumen: 0, voidLens: 0, sentinelCipher: 0,
   riftAlloy: 0, phaseLattice: 0, repairNanites: 0,
   gearPhaseLance: 0, gearLivingBulwark: 0, gearChronoDrive: 0, gearFoundryHeart: 0, gearStarfallCrown: 0,
@@ -169,7 +165,6 @@ export function defaultGameState(): GameState {
     drones: { mining: 0, salvage: 0, survey: 0, combat: 0, cargo: 0 },
     vehicles: { rover: 0, boardingShuttle: 0 },
     researchUnlocked: [],
-    researchPath: null,
     collection: [],
     factions: { patrol: 0, prospectors: 0, institute: 0, frontier: 0, corsairs: 0 },
     contractsCompleted: [],
@@ -177,8 +172,6 @@ export function defaultGameState(): GameState {
     missionsCompleted: [],
     activeExpedition: null,
     completedExpeditions: 0,
-    patrol: 1,
-    commandPoints: 0,
     achievements: [],
     hull: 100,
     maxHull: 100,
@@ -187,7 +180,7 @@ export function defaultGameState(): GameState {
     equippedGear: null,
     statusEffects: [],
     combat: { weapon: "laser", stance: "balanced", activeTaskId: null, progress: 0, victories: {}, streak: 0, bestStreak: 0, lastLoot: null },
-    storyLog: ["Patrol 01 commissioned at Erebus Station."],
+    storyLog: ["Aethelgard docked at Erebus Station."],
     pendingEvent: null,
   };
 }
@@ -287,7 +280,6 @@ export function sanitizeGameState(value: unknown): GameState {
     drones: numericRecord(input.drones, defaults.drones, 100),
     vehicles: numericRecord(input.vehicles, defaults.vehicles, 20),
     researchUnlocked: stringList(input.researchUnlocked),
-    researchPath: ["industrial", "exploration", "military", "xenotechnology"].includes(String(input.researchPath)) ? input.researchPath as ResearchPath : null,
     collection: stringList(input.collection, 500),
     factions: numericRecord(input.factions, defaults.factions, 100),
     contractsCompleted: stringList(input.contractsCompleted, 500),
@@ -297,8 +289,6 @@ export function sanitizeGameState(value: unknown): GameState {
       ? { id: expeditionInput.id.slice(0, 60), endsAt: boundedNumber(expeditionInput.endsAt, Date.now(), Date.now() + 7 * 86_400_000) }
       : null,
     completedExpeditions: boundedNumber(input.completedExpeditions, 0, 1_000_000),
-    patrol: Math.max(1, boundedNumber(input.patrol, 1, 1000)),
-    commandPoints: boundedNumber(input.commandPoints, 0, 10_000),
     achievements: stringList(input.achievements, 500),
     hull: boundedNumber(input.hull, defaults.hull, 100_000),
     maxHull: Math.max(1, boundedNumber(input.maxHull, defaults.maxHull, 100_000)),

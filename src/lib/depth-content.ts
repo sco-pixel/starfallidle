@@ -102,7 +102,7 @@ export const advancedActivities: Activity[] = (Object.keys(operationNames) as Ex
       level,
       seconds: 16 + tier * 4,
       xp: 110 + tier * 75,
-      description: `A tier ${tier + 1} specialist operation using ${skillId === "botany" ? "sealed xenobiology" : skillId === "diplomacy" ? "five-sector influence" : "late-patrol technology"}.`,
+      description: `A tier ${tier + 1} specialist operation using ${skillId === "botany" ? "sealed xenobiology" : skillId === "diplomacy" ? "five-sector influence" : "late-frontier technology"}.`,
       produces: recipe.produces,
       consumes: recipe.consumes,
       credits: ["logistics", "diplomacy", "salvage"].includes(skillId) ? 90 + tier * 85 : undefined,

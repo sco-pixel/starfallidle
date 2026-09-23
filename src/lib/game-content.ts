@@ -45,7 +45,7 @@ export const itemNames: Record<string, string> = {
   titanium: "Titanium Ore", phaseCrystal: "Phase Crystals", darkMatter: "Dark Matter", quantumDust: "Quantum Dust",
   neutronium: "Neutronium", quantumCircuit: "Quantum Circuits", ancientCore: "Ancient Cores", xenoFiber: "Xeno-fibre",
   neuralGel: "Neural Gel", quantumParts: "Quantum Components", titaniumPlate: "Titanium Plating", quantumAlloy: "Quantum Alloy",
-  neutroniumPlate: "Neutronium Plating", singularityCore: "Singularity Cores", genesisCompound: "Genesis Compound",
+  neutroniumPlate: "Neutronium Plating", singularityCore: "Singularity Cores", genesisSeed: "Genesis Seed", genesisCompound: "Genesis Compound",
   voidData: "Void Data", commandToken: "Command Token", phaseFilament: "Phase Filament", bioLumen: "Bio-lumen",
   voidLens: "Void Lens", sentinelCipher: "Sentinel Cipher", riftAlloy: "Rift Alloy", phaseLattice: "Phase Lattice", repairNanites: "Repair Nanites",
   gearPhaseLance: "Phase Lance", gearLivingBulwark: "Living Bulwark",
@@ -60,9 +60,9 @@ const coreActivities: Activity[] = [
   { id: "relay-hulk", skillId: "salvage", name: "Relay Hulk", level: 6, seconds: 7, xp: 23, description: "Extract intact circuits from a silent relay.", produces: { salvage: 4, circuits: 1 }, credits: 5, sectors: ["helix", "cinder", "orpheus", "silent"], collectionId: "wreck-relay" },
   { id: "warship-grave", skillId: "salvage", name: "Warship Grave", level: 14, seconds: 10, xp: 40, description: "Work a dangerous pre-collapse wreck field.", produces: { salvage: 8, circuits: 3, plating: 1 }, credits: 12, sectors: ["cinder", "silent"], collectionId: "wreck-dreadnought" },
   { id: "algae-vat", skillId: "botany", name: "Algae Vats", level: 1, seconds: 4, xp: 9, description: "Cultivate a hardy oxygenating food base.", produces: { algae: 3 }, collectionId: "flora-algae" },
-  { id: "hydroponic-bay", skillId: "botany", name: "Hydroponic Bay", level: 5, seconds: 7, xp: 20, description: "Convert algae cultures into patrol rations.", consumes: { algae: 4 }, produces: { rations: 2 }, collectionId: "flora-kelp" },
+  { id: "hydroponic-bay", skillId: "botany", name: "Hydroponic Bay", level: 5, seconds: 7, xp: 20, description: "Convert algae cultures into shipboard rations.", consumes: { algae: 4 }, produces: { rations: 2 }, collectionId: "flora-kelp" },
   { id: "xeno-spores", skillId: "botany", name: "Xeno Spore Culture", level: 13, seconds: 9, xp: 36, description: "Grow a rare catalyst under sealed glass.", consumes: { algae: 5 }, produces: { rations: 3, catalyst: 1 }, sectors: ["helix", "orpheus", "silent"], collectionId: "flora-spore" },
-  { id: "hull-repair", skillId: "engineering", name: "Hull Repair", level: 1, seconds: 5, xp: 13, description: "Use salvage to restore the patrol vessel.", consumes: { salvage: 2 }, produces: {}, collectionId: "blueprint-repair" },
+  { id: "hull-repair", skillId: "engineering", name: "Hull Repair", level: 1, seconds: 5, xp: 13, description: "Use salvage to restore the cruiser hull.", consumes: { salvage: 2 }, produces: {}, collectionId: "blueprint-repair" },
   { id: "armour-plating-repair", skillId: "engineering", name: "Armour Plating Repair", level: 18, seconds: 11, xp: 58, description: "Replace damaged hull plating and restore deflector integrity.", consumes: { salvage: 5, plating: 2, circuits: 2 }, produces: {}, collectionId: "blueprint-armour-repair" },
   { id: "reactor-grid-repair", skillId: "engineering", name: "Reactor Grid Repair", level: 42, seconds: 18, xp: 142, description: "Rebalance damaged power relays for a major cruiser recovery.", consumes: { plating: 5, circuits: 6, powerCell: 3 }, produces: {}, sectors: ["orpheus", "silent"], collectionId: "blueprint-reactor-repair" },
   { id: "drone-chassis", skillId: "engineering", name: "Drone Chassis", level: 7, seconds: 8, xp: 28, description: "Fabricate autonomous cargo and mining hardware.", consumes: { plating: 1, circuits: 2 }, produces: { droneParts: 2 }, collectionId: "blueprint-drone" },
@@ -103,7 +103,7 @@ const coreActivities: Activity[] = [
   { id: "helix-lab-wreck", skillId: "salvage", name: "Helix Laboratory Wreck", level: 9, seconds: 8, xp: 30, description: "Strip protected research hardware from a ruined laboratory.", produces: { circuits: 2, data: 2, salvage: 3 }, credits: 8, sectors: ["helix", "orpheus", "silent"] },
   { id: "sentinel-carcass", skillId: "salvage", name: "Sentinel Carcass", level: 20, seconds: 13, xp: 60, description: "Dismantle an ancient machine without reactivating its core.", produces: { plating: 3, relic: 2, circuits: 4 }, credits: 20, sectors: ["silent"] },
 
-  { id: "protein-moss", skillId: "botany", name: "Protein Moss Beds", level: 3, seconds: 5, xp: 14, description: "Cultivate a resilient staple crop for long patrols.", consumes: { algae: 2 }, produces: { rations: 2 } },
+  { id: "protein-moss", skillId: "botany", name: "Protein Moss Beds", level: 3, seconds: 5, xp: 14, description: "Cultivate a resilient staple crop for long voyages.", consumes: { algae: 2 }, produces: { rations: 2 } },
   { id: "medicinal-lichen", skillId: "botany", name: "Medicinal Lichen", level: 8, seconds: 8, xp: 29, description: "Grow quarantine lichen rich in useful organic compounds.", consumes: { algae: 4 }, produces: { catalyst: 2, medicine: 1 }, sectors: ["helix", "orpheus", "silent"] },
   { id: "void-orchard", skillId: "botany", name: "Void Orchard", level: 20, seconds: 13, xp: 59, description: "Maintain fruiting xenoflora adapted to machine-world radiation.", consumes: { algae: 8, catalyst: 1 }, produces: { rations: 7, catalyst: 3, relic: 1 }, sectors: ["silent"] },
 
@@ -166,7 +166,7 @@ export const sectors = [
 ];
 
 export const shipModules: Record<ShipModuleId, { name: string; description: string; effect: (level: number) => string }> = {
-  bridge: { name: "Bridge", description: "Deck 1 command bridge with helm, tactical and patrol-control stations.", effect: (level) => `+${level} Astrogation, Logistics and Diplomacy output.` },
+  bridge: { name: "Bridge", description: "Deck 1 command bridge with helm, tactical and station-control consoles.", effect: (level) => `+${level} Astrogation, Logistics and Diplomacy output.` },
   cic: { name: "Combat Information Centre", description: "Deck 1 tactical centre coordinating sensors, weapons and drone swarms.", effect: (level) => `+${level} combat accuracy and -${level} incoming combat damage.` },
   cargo: { name: "Cargo Bay", description: "Deck 3 modular 200-ton hold with magnetic restraints, lift and vehicle access.", effect: (level) => `+${level * 2}% station sale value.` },
   hydroponics: { name: "Hydroponics", description: "Deck 2 life-support gardens supplying fresh food, herbs and atmosphere support.", effect: (level) => `+${level} Xenobotany and Biochemistry output.` },
@@ -223,7 +223,7 @@ export const researchNodes: { id: string; name: string; description: string; cos
   { id: "boss-analysis", name: "Boss Analysis", description: "Sector bosses deal 15% less damage.", cost: { voidData: 45, ancientCore: 2 }, requires: ["sentinel-protocol"] },
   { id: "outpost-network", name: "Outpost Network", description: "Outpost bonuses apply throughout their sector.", cost: { quantumCircuit: 18, titaniumPlate: 10 }, requires: ["titanium-printing"] },
   { id: "singularity-theory", name: "Singularity Theory", description: "Unlock the highest tier of specialist operations.", cost: { voidData: 80, quantumDust: 30, ancientCore: 5 }, requires: ["boss-analysis", "outpost-network"] },
-  { id: "starfall-doctrine", name: "Starfall Doctrine", description: "Command Points improve all output by one per five points.", cost: { singularityCore: 2, commandToken: 1 }, requires: ["singularity-theory"] },
+  { id: "starfall-doctrine", name: "Starfall Doctrine", description: "Every 25 mastered operations improve all output by one.", cost: { singularityCore: 2, commandToken: 1 }, requires: ["singularity-theory"] },
   { id: "recovery-protocols", name: "Recovery Protocols", description: "Medicine and Biochemistry actions complete 8% faster.", cost: { data: 36, medicine: 6 }, requires: ["xeno-adaptation"] },
   { id: "broker-network", name: "Broker Network", description: "Faction contracts award 25% more reputation.", cost: { data: 38, navData: 6 }, requires: ["phase-mapping"] },
   { id: "data-vaults", name: "Data Vaults", description: "Science and Archaeology operations gain +1 output.", cost: { relic: 6, circuits: 8 }, requires: ["sentinel-protocol"] },
@@ -267,7 +267,7 @@ export const expeditions: { id: string; name: string; minutes: number; level: nu
   { id: "machine-core", name: "Descend into the Machine Core", minutes: 35, level: 1000, description: "Reach the intelligence chamber beneath the Silent Systems.", cost: { singularityCore: 1, genesisCompound: 5, fuelRod: 10 }, reward: { commandToken: 1, voidData: 50 }, collection: "expedition-core", skill: "science", xp: 10000, vehicle: "boardingShuttle" },
 ];
 
-export type StoryEvent = { title: string; purpose: string; text: string; choices: { id: string; label: string; result: string; reward: Record<string, number>; morale: number; faction?: { id: string; reputation: number }; commandPoints?: number; xp?: { skill: SkillId; amount: number } }[] };
+export type StoryEvent = { title: string; purpose: string; text: string; choices: { id: string; label: string; result: string; reward: Record<string, number>; morale: number; faction?: { id: string; reputation: number }; xp?: { skill: SkillId; amount: number } }[] };
 
 export const storyEvents: Record<string, StoryEvent> = {
   escapePod: {
@@ -317,10 +317,10 @@ export const storyEvents: Record<string, StoryEvent> = {
   },
   veteranCeremony: {
     title: "Veteran Crew Ceremony",
-    purpose: "Convert crew morale into a lasting commission benefit or immediate operational supplies.",
-    text: "The crew asks for a brief ceremony after another long patrol milestone. The bridge has time for one meaningful gesture.",
+    purpose: "Turn a crew celebration into morale or immediate operational supplies.",
+    text: "The crew asks for a brief ceremony after a successful station visit. The bridge has time for one meaningful gesture.",
     choices: [
-      { id: "commend", label: "Issue commendations", result: "The crew records the commission as one worth remembering.", reward: { credits: 60 }, morale: 8, commandPoints: 1 },
+      { id: "commend", label: "Issue commendations", result: "The crew records the visit as one worth remembering.", reward: { credits: 60 }, morale: 8 },
       { id: "train", label: "Run a tactical drill", result: "The crew turns the occasion into a focused readiness exercise.", reward: { missiles: 4, medicine: 3 }, morale: 3 },
     ],
   },

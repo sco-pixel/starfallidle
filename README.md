@@ -12,7 +12,7 @@ A mobile-friendly science-fiction idle RPG inspired by skill-based progression g
 - Constructible planetary rover and boarding shuttle
 - Parallel vessel combat, five late-game bosses, unique equipment, tactical loadouts, persistent battle conditions, shields, hull damage, and automatic retreat
 - Eight timed expeditions, faction contracts and alliances, 22 sector objectives, narrative missions, and station markets
-- Research tree and permanent specializations, discovery collection, operation rares, achievements, story events, and redesigned patrol prestige
+- One permanent research tree, discovery collection, operation rares, achievements, and story events
 - Capped offline progression with multi-operation production queues and detailed return reports
 - Device-local saves and capped offline progression
 
