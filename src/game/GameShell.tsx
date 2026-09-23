@@ -767,7 +767,6 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
       <main className="play-column">
         {offlineReport ? <div className="offline-report panel"><Cloud /><div><strong>Offline progress report · {duration(offlineReport.seconds)}</strong><span>{offlineReport.activity} · {offlineReport.actions} actions · +{offlineReport.xp} XP · {itemsText(offlineReport.gains)}</span></div><button onClick={() => setOfflineReport(null)}>×</button></div> : null}
-        {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
         {view === "skills" ? <section className="active-operation panel">
           <div className="operation-mark"><Sprite kind="operation" id={active.id} label={`${active.name} operation sprite`} className="active-operation-sprite" decorative /></div>
           <div className="operation-body">
@@ -797,6 +796,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
       <aside className="status-column v3-status">
         <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} /><Stat icon={Medal} label="Achievements" value={state.achievements.length} /><Stat icon={Trophy} label="Mastered" value={Object.values(state.operationMastery).filter((mastery) => mastery >= 100).length} /></div>
         <div className="vitals panel"><div><span>Hull</span><strong>{state.hull} / {state.maxHull}</strong></div><Progress value={state.hull / state.maxHull * 100} /><div><span>Shields</span><strong>{state.shields}</strong></div><Progress value={Math.min(100, state.shields)} /><div><span>Crew morale</span><strong>{state.crewMorale}%</strong></div><Progress value={state.crewMorale} /></div>
+        {state.pendingEvent ? <StoryEvent eventId={state.pendingEvent} onChoose={resolveEvent} /> : null}
         <div className="side-nav panel">
           {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
         </div>
