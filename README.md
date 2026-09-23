@@ -16,26 +16,6 @@ A mobile-friendly science-fiction idle RPG inspired by skill-based progression g
 - Capped offline progression with multi-operation production queues and detailed return reports
 - Device-local saves and capped offline progression
 
-## Development
-
-Requires Node.js 22.13 or newer and pnpm.
-
-```bash
-pnpm install
-pnpm dev
-```
-
-Create a production build with:
-
-```bash
-pnpm build
-```
-
-## Persistence
-
-Starfall Idle is a static, browser-only app. Progress is saved in `localStorage` under `starfall-idle-save-v5`, and offline progression is calculated when the game opens. Saves are specific to a browser profile and are not shared between devices.
-
-
 ## Stack
 
 - React 19
@@ -45,6 +25,6 @@ Starfall Idle is a static, browser-only app. Progress is saved in `localStorage`
 - Tailwind CSS
 - Radix UI and Lucide icons
 
-## Deploy to GitHub Pages
+## Community
 
-The included GitHub Actions workflow publishes `dist/` whenever `main` is pushed. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions** once. The deployed game is available at the repository's GitHub Pages URL.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, save compatibility, pull requests, and deployment details. Community expectations and reporting guidance are in [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
