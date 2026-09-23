@@ -7,7 +7,7 @@
  */
 import { activities } from "./game-content";
 
-export type SpriteKind = "skill" | "operation" | "item" | "credits" | "cargo";
+export type SpriteKind = "skill" | "operation" | "item" | "cargo";
 
 type AtlasPosition = { column: number; row: number };
 
@@ -70,7 +70,6 @@ const items: Record<string, Omit<SpriteReference, "src">> = {
 
 const generic: Record<Exclude<SpriteKind, "skill" | "item">, Omit<SpriteReference, "src">> = {
   operation: { fallback: "OP", accent: "command" },
-  credits: { fallback: "CR", accent: "wealth", atlas: { column: 7, row: 5 } },
   cargo: { fallback: "CG", accent: "tech" },
 };
 

@@ -303,7 +303,6 @@ h3 { font-size: 1rem; }
 .resource:last-child { border: 0; }
 .resource > span { color: #dbad54; }
 .resource svg { width: 16px; }
-.resource .resource-sprite { width: 20px; height: 20px; }
 .resource small, .resource strong { display: block; }
 .resource small { color: #7f8c9a; font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; }
 .resource strong { margin-top: 1px; font: 700 .87rem var(--font-mono); }

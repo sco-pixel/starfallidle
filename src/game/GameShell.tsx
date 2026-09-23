@@ -795,7 +795,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
       </main>
 
       <aside className="status-column v3-status">
-        <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} sprite="credits" /><Stat icon={Medal} label="Achievements" value={state.achievements.length} /><Stat icon={Trophy} label="Mastered" value={Object.values(state.operationMastery).filter((mastery) => mastery >= 100).length} /></div>
+        <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} /><Stat icon={Medal} label="Achievements" value={state.achievements.length} /><Stat icon={Trophy} label="Mastered" value={Object.values(state.operationMastery).filter((mastery) => mastery >= 100).length} /></div>
         <div className="vitals panel"><div><span>Hull</span><strong>{state.hull} / {state.maxHull}</strong></div><Progress value={state.hull / state.maxHull * 100} /><div><span>Shields</span><strong>{state.shields}</strong></div><Progress value={Math.min(100, state.shields)} /><div><span>Crew morale</span><strong>{state.crewMorale}%</strong></div><Progress value={state.crewMorale} /></div>
         <div className="side-nav panel">
           {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
@@ -1089,6 +1089,6 @@ function StoryEvent({ eventId, onChoose }: { eventId: string; onChoose: (id: str
   return <section className="story-event panel"><Sparkles /><div><p className="eyebrow">SHIP EVENT · {event.purpose}</p><h2>{event.title}</h2><p>{event.text}</p><div>{event.choices.map((choice) => <Button key={choice.id} variant="outline" onClick={() => onChoose(choice.id)}>{choice.label}</Button>)}</div></div></section>;
 }
 
-function Stat({ icon: Icon, label, value, sprite }: { icon: typeof Coins; label: string; value: number; sprite?: "credits" }) {
-  return <div className="resource">{sprite ? <Sprite kind={sprite} label={label} className="resource-sprite" decorative /> : <Icon />}<small>{label}</small><strong>{fmt(value)}</strong></div>;
+function Stat({ icon: Icon, label, value }: { icon: typeof Coins; label: string; value: number }) {
+  return <div className="resource"><Icon /><small>{label}</small><strong>{fmt(value)}</strong></div>;
 }
