@@ -17,5 +17,5 @@ Do not add more sectors, locations, sublocations, destinations, planets, station
 - Skill-based idle RPG inspired by the depth and interconnected progression of RuneScape and Melvor Idle, with original systems and a science-fiction identity.
 - Combat runs independently alongside one non-combat skill.
 - Offline progression is a core feature.
-- Guest play remains available; signed-in saves remain server-authorized and stored in D1.
+- Saves are browser-local and retain capped offline progression; cloud saves and server-verified rankings are not part of the static deployment.
 - Ko-fi integration is not part of the project.

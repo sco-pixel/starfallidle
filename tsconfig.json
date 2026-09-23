@@ -17,31 +17,30 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
       "@/*": [
         "./*"
       ]
     },
-    "types": [
-      "node",
-      "@cloudflare/workers-types"
-    ]
+    "types": ["node"]
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
   "exclude": [
     "node_modules",
-    "examples"
+    "examples",
+    "app/api",
+    "app/chatgpt-auth.ts",
+    "app/layout.tsx",
+    "app/play",
+    "build",
+    "db",
+    "drizzle.config.ts",
+    "lib/game-save.ts",
+    "lib/hiscores.ts",
+    "next.config.ts"
   ]
 }

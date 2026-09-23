@@ -18,11 +18,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
-  AlertDialogTitle, AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
   activities, collectionEntries, contracts, crew, droneSpecs, equipmentSpecs,
   expeditions, itemNames, researchNodes, sectors, shipModules, skillMeta, vehicleSpecs,
   storyEvents, totalLevel, type Activity as SkillActivity,
@@ -39,8 +34,7 @@ declare global {
   }
 }
 
-type SaveStatus = "guest" | "saved" | "saving" | "error";
-type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts" | "hiscores";
+type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "patrol" | "character" | "outposts";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
@@ -72,7 +66,7 @@ const navigation: { group: string; items: { id: ViewId; label: string; icon: typ
   { group: "Archives", items: [
     { id: "research", label: "Research", icon: BrainCircuit }, { id: "collection", label: "Collection", icon: Telescope },
     { id: "patrol", label: "Patrol Record", icon: Medal },
-    { id: "hiscores", label: "Hiscores", icon: Trophy }, { id: "character", label: "Character", icon: UserRound },
+    { id: "character", label: "Character", icon: UserRound },
   ] },
 ];
 
@@ -473,54 +467,27 @@ function completeExpedition(state: GameState) {
   });
 }
 
-function hasMeaningfulGuestProgress(state: GameState) {
-  return state.totalActions > 0 || state.patrol > 1 || state.completedExpeditions > 0 ||
-    state.missionsCompleted.length > 0 || state.collection.length > 0 ||
-    SKILL_IDS.some((id) => state.skills[id].xp > 0);
-}
-
-export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave, accountId, accountName, accountEmail, signInPath, signOutPath }: { initialState: GameState; signedIn: boolean; saveAvailable: boolean; hasCloudSave: boolean; accountId: string | null; accountName: string; accountEmail: string | null; signInPath: string; signOutPath: string }) {
+export function GameShell({ initialState }: { initialState: GameState }) {
   const [state, setState] = useState(initialState);
   const [view, setView] = useState<ViewId>("skills");
   const [selectedSkill, setSelectedSkill] = useState<SkillId>(initialState.activeTask.skillId);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>(signedIn && saveAvailable ? "saved" : signedIn ? "error" : "guest");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [offlineReport, setOfflineReport] = useState<OfflineReport | null>(null);
-  const [guestImport, setGuestImport] = useState<GameState | null>(null);
   const [now, setNow] = useState(initialState.lastActiveAt);
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSave = useRef(false);
-  const cloudSaveEnabled = useRef(false);
-  const cloudSignedIn = signedIn;
-  const cloudSaveAvailable = saveAvailable;
-  const activeAccountId = accountId;
-  const activeAccountName = accountName;
-  const activeAccountEmail = accountEmail;
+  const activeAccountName = "Guest commander";
   useEffect(() => { stateRef.current = state; }, [state]);
 
-  const persist = useCallback(async (next: GameState) => {
-    if (!cloudSignedIn || !cloudSaveAvailable || !cloudSaveEnabled.current) return;
-    setSaveStatus("saving");
-    try {
-      const response = await fetch("/api/save", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...next, lastActiveAt: Date.now() }), keepalive: true,
-      });
-      if (!response.ok) throw new Error("Save failed");
-      pendingSave.current = false;
-      setSaveStatus("saved");
-    } catch { setSaveStatus("error"); }
-  }, [cloudSaveAvailable, cloudSignedIn]);
+  const persist = useCallback((next: GameState) => {
+    try { localStorage.setItem("starfall-idle-save-v5", JSON.stringify({ ...next, lastActiveAt: Date.now() })); } catch {}
+  }, []);
 
   const queueSave = useCallback((next: GameState) => {
-    if (!cloudSignedIn || !cloudSaveAvailable) return;
-    pendingSave.current = true;
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => void persist(next), 700);
-  }, [cloudSaveAvailable, cloudSignedIn, persist]);
+    saveTimer.current = setTimeout(() => persist(next), 700);
+  }, [persist]);
 
   const updateState = useCallback((updater: (current: GameState) => GameState) => {
     setState((current) => {
@@ -534,23 +501,10 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   /* eslint-disable react-hooks/set-state-in-effect -- hydration imports browser-only guest state into the live game. */
   useEffect(() => {
     let base = initialState;
-    if (!cloudSignedIn) {
-      try {
-        const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v5") ?? localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
-        if (parsed) base = sanitizeGameState(parsed);
-      } catch {}
-    } else {
-      const marker = activeAccountId ? `starfall-idle-guest-import-v1:${activeAccountId}` : null;
-      try {
-        const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v5") ?? localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
-        const candidate = parsed ? sanitizeGameState(parsed) : null;
-        if (candidate && hasMeaningfulGuestProgress(candidate) && marker && !localStorage.getItem(marker)) {
-          // The prompt intentionally blocks cloud writes until the player chooses a save.
-          cloudSaveEnabled.current = false;
-          setGuestImport(candidate);
-        } else cloudSaveEnabled.current = true;
-      } catch { cloudSaveEnabled.current = true; }
-    }
+    try {
+      const parsed = JSON.parse(localStorage.getItem("starfall-idle-save-v5") ?? localStorage.getItem("starfall-idle-save-v4") ?? localStorage.getItem("starfall-idle-save-v3") ?? localStorage.getItem("starfall-idle-save-v2") ?? "null");
+      if (parsed) base = sanitizeGameState(parsed);
+    } catch {}
     base = completeExpedition(base);
     const result = applyOffline(base);
     // Hydration is where a guest save and its offline simulation become the live client state.
@@ -560,36 +514,18 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     setOfflineReport(result.report);
     setHydrated(true);
     if (result.report) queueSave(result.state);
-  }, [activeAccountId, cloudSignedIn, initialState, queueSave]);
+  }, [initialState, queueSave]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const resolveGuestImport = (useGuest: boolean) => {
-    const marker = activeAccountId ? `starfall-idle-guest-import-v1:${activeAccountId}` : null;
-    if (marker) {
-      try { localStorage.setItem(marker, useGuest ? "imported" : "kept-cloud"); } catch {}
-    }
-    const guestResult = useGuest && guestImport ? applyOffline(completeExpedition(guestImport)) : null;
-    const chosen = guestResult?.state ?? stateRef.current;
-    if (guestResult) {
-      setState(chosen);
-      stateRef.current = chosen;
-      setSelectedSkill(chosen.activeTask.skillId);
-      setOfflineReport(guestResult.report);
-    }
-    cloudSaveEnabled.current = true;
-    setGuestImport(null);
-    void persist(chosen);
-  };
-
   useEffect(() => {
-    if (!hydrated || cloudSignedIn) return;
+    if (!hydrated) return;
     const saveGuest = () => {
       try { localStorage.setItem("starfall-idle-save-v5", JSON.stringify({ ...stateRef.current, lastActiveAt: Date.now() })); } catch {}
     };
     const timer = setInterval(saveGuest, 3000);
     document.addEventListener("visibilitychange", saveGuest);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", saveGuest); saveGuest(); };
-  }, [cloudSignedIn, hydrated]);
+  }, [hydrated]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -623,14 +559,6 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     }, 250);
     return () => clearInterval(timer);
   }, [queueSave]);
-
-  useEffect(() => {
-    if (!cloudSignedIn || !cloudSaveAvailable) return;
-    const timer = setInterval(() => { if (pendingSave.current) void persist(stateRef.current); }, 8000);
-    const flush = () => { if (pendingSave.current) void persist(stateRef.current); };
-    document.addEventListener("visibilitychange", flush);
-    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", flush); };
-  }, [cloudSaveAvailable, cloudSignedIn, persist]);
 
   const startActivity = useCallback((activity: SkillActivity) => {
     const current = stateRef.current;
@@ -678,7 +606,6 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
   const xpEnd = selectedProgress.level === MAX_SKILL_LEVEL ? selectedProgress.xp : xpForLevel(selectedProgress.level + 1);
   const xpProgress = selectedProgress.level === MAX_SKILL_LEVEL ? 100 : (selectedProgress.xp - xpStart) / Math.max(1, xpEnd - xpStart) * 100;
   const displayName = state.displayName || activeAccountName;
-  const saveLabel = saveStatus === "saved" ? "Cloud save current" : saveStatus === "saving" ? "Saving patrol" : saveStatus === "error" ? "Cloud save interrupted" : "Saved on this device";
   const openView = (nextView: ViewId) => { setView(nextView); setMobileMenuOpen(false); };
 
   const travel = (sectorId: string) => updateState((current) => {
@@ -871,43 +798,25 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
     collection: ["Discovery Archive", "Record resources, enemies, ruins and expeditions"],
     market: ["Station Market", "Prices shift every five minutes and vary by sector"],
     patrol: ["Patrol Record", "Achievements, mastery and five-year commission cycles"],
-    character: ["Character & Settings", "Manage your commander identity and account"],
+    character: ["Character & Settings", "Manage your commander identity and local save"],
     outposts: ["Sector Outposts", "Develop support infrastructure across the five established sectors"],
-    hiscores: ["Commander Hiscores", "Compare verified cloud-save records across the Starfall fleet"],
   };
 
   return (
     <>
       <header className="site-header">
-        <a className="brand-lockup" href="/" aria-label="Return to the Starfall Idle home screen">
+        <a className="brand-lockup" href="#/" aria-label="Return to the Starfall Idle home screen">
           <span className="brand-mark" aria-hidden="true"><Orbit /></span>
           <div><p className="eyebrow">SECTOR // {activeSector.name.toUpperCase()}</p><h1>Starfall Idle</h1></div>
         </a>
         <div className="account-area">
           <p className="greeting">Welcome aboard, <strong>{displayName}</strong></p>
           <a className="support-link" href="https://ko-fi.com/w644769" target="_blank" rel="noreferrer"><Coins /> Support</a>
-          {signedIn
-            ? <><span className={`header-save-indicator ${saveStatus}`} role="status" aria-label={saveLabel} title={saveLabel}>{saveStatus === "saved" ? <ShieldCheck /> : <Cloud />}</span><button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button></>
-            : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+          <span className="header-save-indicator" role="status" aria-label="Saved on this device" title="Saved on this device"><ShieldCheck /></span>
+          <button className="account-link" onClick={() => openView("character")}><UserRound /> Character</button>
         </div>
       </header>
-      <AlertDialog open={Boolean(guestImport)}>
-        <AlertDialogContent className="guest-import-dialog">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Guest patrol found on this device</AlertDialogTitle>
-            <AlertDialogDescription>Choose which character should be attached to your signed-in Starfall account. This choice is shown once on this device and does not combine inventories or XP.</AlertDialogDescription>
-          </AlertDialogHeader>
-          {guestImport ? <div className="guest-import-comparison">
-            <section><p className="eyebrow">DEVICE GUEST</p><strong>{guestImport.displayName || "Guest commander"}</strong><span>Total level {totalLevel(guestImport)}</span><span>Patrol {guestImport.patrol} · {fmt(guestImport.totalActions)} operations</span></section>
-            <section><p className="eyebrow">CLOUD CHARACTER</p><strong>{initialState.displayName || accountName}</strong><span>Total level {totalLevel(initialState)}</span><span>{hasCloudSave ? `Patrol ${initialState.patrol} · ${fmt(initialState.totalActions)} operations` : "No existing cloud save"}</span></section>
-          </div> : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => resolveGuestImport(false)}>{hasCloudSave ? "Keep cloud character" : "Start new cloud character"}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => resolveGuestImport(true)}>Use guest progress</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    <div className={`game-layout v3 with-skill-nav ${view === "hiscores" ? "hiscores-mode" : ""}`}>
+    <div className="game-layout v3 with-skill-nav">
       <aside className="command-nav panel">
         <button className={`home-button ${view === "skills" ? "selected" : ""}`} onClick={() => setView("skills")}><Activity /><span><strong>Skill Matrix</strong><small>TL {totalLevel(state)}</small></span></button>
         <div className="skill-list expanded-skills">
@@ -947,17 +856,16 @@ export function GameShell({ initialState, signedIn, saveAvailable, hasCloudSave,
         {view === "market" ? <MarketView state={state} now={now} getPrice={marketPrice} onTrade={trade} /> : null}
         {view === "patrol" ? <PatrolView state={state} onNewPatrol={beginNewPatrol} /> : null}
         {view === "outposts" ? <OutpostView state={state} onDevelop={developOutpost} /> : null}
-        {view === "hiscores" ? <HiscoresView signedIn={signedIn} signInPath={signInPath} /> : null}
-        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} email={activeAccountEmail} signedIn={signedIn} signInPath={signInPath} signOutPath={signOutPath} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
+        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
       </main>
 
-      {view !== "hiscores" ? <aside className="status-column v3-status">
+      <aside className="status-column v3-status">
         <div className="wallet panel"><Stat icon={Coins} label="Credits" value={state.credits} /><Stat icon={Medal} label="Patrol" value={state.patrol} /><Stat icon={Trophy} label="Command" value={state.commandPoints} /></div>
         <div className="vitals panel"><div><span>Hull</span><strong>{state.hull} / {state.maxHull}</strong></div><Progress value={state.hull / state.maxHull * 100} /><div><span>Shields</span><strong>{state.shields}</strong></div><Progress value={Math.min(100, state.shields)} /><div><span>Crew morale</span><strong>{state.crewMorale}%</strong></div><Progress value={state.crewMorale} /></div>
         <div className="side-nav panel">
           {navigation.map((group) => <div key={group.group}><p className="eyebrow">{group.group}</p>{group.items.map((item) => { const Icon = item.icon; return <button key={item.id} className={view === item.id ? "selected" : ""} onClick={() => openView(item.id)}><Icon /><span>{item.label}</span><ChevronRight /></button>; })}</div>)}
         </div>
-      </aside> : null}
+      </aside>
 
       <nav className="mobile-nav wide-mobile" aria-label="Game sections">
         <button className={view === "skills" ? "selected" : ""} onClick={() => openView("skills")}><Activity /><span>Skills</span></button>
@@ -1351,7 +1259,7 @@ function HiscoresView({ signedIn, signInPath }: { signedIn: boolean; signInPath:
   </div>;
 }
 
-function CharacterView({ state, fallbackName, email, signedIn, signInPath, signOutPath, onSaveName }: { state: GameState; fallbackName: string; email: string | null; signedIn: boolean; signInPath: string; signOutPath: string; onSaveName: (name: string) => void }) {
+function CharacterView({ state, fallbackName, onSaveName }: { state: GameState; fallbackName: string; onSaveName: (name: string) => void }) {
   const [name, setName] = useState(state.displayName || fallbackName);
   const savedName = state.displayName || fallbackName;
   const initials = savedName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "SC";
@@ -1363,7 +1271,7 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
   return <div className="character-settings">
     <section className="character-card panel">
       <div className="character-emblem">{initials}</div>
-      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>{signedIn ? "ChatGPT account · cloud save active" : "Guest profile · saved on this device"}</span></div>
+      <div><p className="eyebrow">COMMANDER PROFILE</p><h2>{savedName}</h2><span>Profile saved on this device</span></div>
       <div className="character-record"><span>Patrol <b>{state.patrol}</b></span><span>Total level <b>{totalLevel(state)}</b></span><span>Operations <b>{fmt(state.totalActions)}</b></span></div>
     </section>
 
@@ -1373,7 +1281,7 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
     </section>
 
     <section className="settings-panel panel">
-      <div><p className="eyebrow">IDENTITY</p><h2>Display name</h2><p>Choose the commander name shown throughout Starfall Idle. This does not change your ChatGPT account name.</p></div>
+      <div><p className="eyebrow">IDENTITY</p><h2>Display name</h2><p>Choose the commander name shown throughout Starfall Idle.</p></div>
       <form onSubmit={submit}>
         <label htmlFor="display-name">Commander display name</label>
         <div><Input id="display-name" value={name} maxLength={32} autoComplete="nickname" onChange={(event) => setName(event.target.value)} placeholder={fallbackName} /><Button type="submit" disabled={name.trim() === state.displayName}>Save name</Button></div>
@@ -1382,8 +1290,7 @@ function CharacterView({ state, fallbackName, email, signedIn, signInPath, signO
     </section>
 
     <section className="settings-panel account-settings panel">
-      <div><p className="eyebrow">ACCOUNT</p><h2>{signedIn ? "ChatGPT account" : "Guest commander"}</h2><p>{signedIn ? <>Signed in as {email}. Your character and patrol progress are stored in your private cloud save.</> : "Sign in with ChatGPT to carry this character and patrol progress between devices."}</p></div>
-      {signedIn ? <a className="sign-out-link" href={signOutPath} target="_top">Sign out</a> : <a className="sign-in-link" href={signInPath} target="_top">Sign in with ChatGPT</a>}
+      <div><p className="eyebrow">LOCAL SAVE</p><h2>This browser only</h2><p>Your character and patrol progress are stored in this browser. Clearing site data or changing devices starts a separate save.</p></div>
     </section>
   </div>;
 }

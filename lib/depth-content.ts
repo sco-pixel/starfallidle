@@ -139,11 +139,11 @@ export const combatActivities: Activity[] = combatTargetNames.map((name, index) 
     seconds: 7 + Math.floor(index / 3),
     xp: 20 + index * 13,
     description: `${className} contact operating inside the established ${stage < 1 ? "frontier" : stage < 2 ? "quarantine frontier" : stage < 3 ? "Cinder and Orpheus lanes" : stage < 4 ? "rift approaches" : "Silent Systems"}.`,
-    produces: index < 10 ? { salvage: 2 + stage, circuits: stage } : index < 22 ? { plating: 1 + stage, circuits: 2 + stage } : index < 30 ? { relic: 1 + stage, data: 3 + stage } : { quantumCircuit: 1 + stage, ancientCore: stage > 4 ? 1 : 0 },
+    produces: (index < 10 ? { salvage: 2 + stage, circuits: stage } : index < 22 ? { plating: 1 + stage, circuits: 2 + stage } : index < 30 ? { relic: 1 + stage, data: 3 + stage } : { quantumCircuit: 1 + stage, ancientCore: stage > 4 ? 1 : 0 }) as Record<string, number>,
     credits: 10 + index * 14,
     damage: 8 + index * 3,
     sectors: sector,
-    enemy: { hull: base * 3, shields: base + stage * 18, armor: 4 + index * 3, evasion: 5 + (index * 7) % 34, class: className, weakness: combatWeaknesses[index % combatWeaknesses.length], rareEvery: 10 + stage * 2, rareDrop: index < 12 ? { droneParts: 1 + stage } : index < 24 ? { powerCell: 2 + stage, relic: 1 } : { voidData: 2 + stage, quantumDust: stage > 3 ? 1 : 0 } },
+    enemy: { hull: base * 3, shields: base + stage * 18, armor: 4 + index * 3, evasion: 5 + (index * 7) % 34, class: className, weakness: combatWeaknesses[index % combatWeaknesses.length], rareEvery: 10 + stage * 2, rareDrop: (index < 12 ? { droneParts: 1 + stage } : index < 24 ? { powerCell: 2 + stage, relic: 1 } : { voidData: 2 + stage, quantumDust: stage > 3 ? 1 : 0 }) as Record<string, number> },
     collectionId: `enemy-contact-${String(index + 1).padStart(2, "0")}`,
   };
 });

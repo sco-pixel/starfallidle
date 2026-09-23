@@ -14,7 +14,7 @@ A mobile-friendly science-fiction idle RPG inspired by skill-based progression g
 - Eight timed expeditions, faction contracts and alliances, 22 sector objectives, narrative missions, and station markets
 - Research tree and permanent specializations, discovery collection, operation rares, achievements, story events, and redesigned patrol prestige
 - Capped offline progression with multi-operation production queues and detailed return reports
-- Device-local guest saves and per-user D1 cloud saves through optional Sign in with ChatGPT
+- Device-local saves and capped offline progression
 
 ## Development
 
@@ -31,21 +31,21 @@ Create a production build with:
 pnpm build
 ```
 
-## Persistence and authentication
+## Persistence
 
-The public game can be played without an account. Guest progress is stored locally in the browser.
+Starfall Idle is a static, browser-only app. Progress is saved in `localStorage` under `starfall-idle-save-v5`, and offline progression is calculated when the game opens. Saves are specific to a browser profile and are not shared between devices.
 
-Signed-in visitors are identified through Sites-managed ChatGPT authentication headers. Save authorization is checked server-side, and each user's state is stored as a JSON record in Cloudflare D1. The database schema and migration are under `db/` and `drizzle/`.
+The legacy ChatGPT Sites/D1 source remains in the repository as an unused migration reference; it is not part of the Vite build or the GitHub Pages artifact.
 
 ## Stack
 
 - React 19
-- Next.js / Vinext
+- Vite
 - TypeScript
-- Cloudflare Workers and D1
+- GitHub Pages
 - Tailwind CSS
 - Radix UI and Lucide icons
 
-## Live game
+## Deploy to GitHub Pages
 
-[Play Starfall Idle](https://starfall-idle.lacoot.chatgpt.site)
+The included GitHub Actions workflow publishes `dist/` whenever `main` is pushed. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions** once. The deployed game is available at the repository's GitHub Pages URL.
