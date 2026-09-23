@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./vendor/shadcn-tailwind-4.13.0.css";
 
 :root {
   --background: #05080d;
@@ -80,7 +79,7 @@ h3 { font-size: 1rem; }
 .brand-mark svg { width: 21px; transform: rotate(-45deg); }
 .greeting { color: #a8b4c1; font-size: .875rem; text-align: right; }
 .greeting strong { color: #f0f4f7; font-weight: 650; }
-.account-link, .sign-in-link {
+.account-link {
   min-height: 40px; padding: 0 14px; border: 1px solid #3a495b; display: inline-flex; align-items: center;
   justify-content: center; color: #dbe4ed; text-decoration: none; font-size: .875rem; font-weight: 750; white-space: nowrap;
 }
@@ -93,7 +92,6 @@ h3 { font-size: 1rem; }
 .header-save-indicator svg { width: 16px; }
 .header-save-indicator.saving { color: #73bfd0; animation: pulse 1.05s ease-in-out infinite; }
 .header-save-indicator.error { color: #e17171; border-color: #713d3d; }
-.sign-in-link { border-color: #e3ac45; background: #e3ac45; color: #07090c; }
 .account-link:hover, .account-link:focus-visible { border-color: #e3ac45; color: #efc46d; }
 
 .starfall-home { width: min(1180px, 100%); margin: 0 auto; padding: 0 clamp(18px, 4vw, 48px) 32px; }
@@ -333,17 +331,6 @@ h3 { font-size: 1rem; }
 .patrol-card [data-slot="progress"] > div { background: #6bb29a; }
 .patrol-card button { width: 100%; margin-top: 10px; padding: 8px 0 0; border: 0; background: transparent; color: #d9ac56; display: flex; justify-content: space-between; font-size: .78rem; cursor: pointer; }
 .patrol-card button svg { width: 15px; }
-.save-state { padding: 14px; display: flex; align-items: flex-start; gap: 10px; }
-.save-state > svg { width: 17px; flex: 0 0 auto; color: #63aec0; }
-.save-state strong, .save-state span, .save-state a { display: block; }
-.save-state strong { font-size: .82rem; }
-.save-state span { margin-top: 3px; color: #8391a0; font-size: .75rem; line-height: 1.4; }
-.save-state a { margin-top: 9px; color: #e2b357; font-size: .78rem; font-weight: 750; }
-.save-state.saved { border-color: #315b53; }
-.save-state.saved > svg { color: #69b89d; }
-.save-state.error { border-color: #713d3d; }
-.save-state.error > svg { color: #e17171; }
-
 .content-panel { display: grid; gap: 14px; }
 .equipment-grid, .objective-list { display: grid; gap: 9px; }
 .equipment-card { min-height: 122px; padding: 16px; display: grid; grid-template-columns: 44px 1fr auto; gap: 13px; align-items: center; }
@@ -366,7 +353,6 @@ h3 { font-size: 1rem; }
 @media (max-width: 1200px) {
   .game-layout { grid-template-columns: 235px minmax(430px, 1fr); }
   .status-column { grid-column: 1 / -1; position: static; display: grid; grid-template-columns: 1fr 2fr 1fr; align-items: start; }
-  .status-column .save-state { min-height: 100%; }
 }
 
 @media (max-width: 760px) {
@@ -377,7 +363,7 @@ h3 { font-size: 1rem; }
   .brand-lockup { gap: 9px; }
   .brand-lockup .eyebrow { display: none; }
   h1 { font-size: .98rem; }
-  .account-link, .sign-in-link { min-height: 38px; padding: 0 10px; font-size: .76rem; white-space: normal; text-align: center; line-height: 1.15; }
+  .account-link { min-height: 38px; padding: 0 10px; font-size: .76rem; white-space: normal; text-align: center; line-height: 1.15; }
   .support-link { display: none; }
   .game-layout { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
   .command-nav, .status-column { position: static; width: 100%; }
@@ -436,7 +422,6 @@ h3 { font-size: 1rem; }
 
 /* Starfall v3 command surfaces */
 .game-layout.v3 { grid-template-columns: 246px minmax(520px, 1fr) 286px; max-width: 1660px; }
-.game-layout.v3.without-skill-nav { grid-template-columns: minmax(520px, 1fr) 286px; max-width: 1398px; }
 .game-layout.v3 .command-nav, .v3-status { max-height: calc(100vh - 102px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #334456 transparent; }
 .home-button {
   width: 100%; min-height: 64px; padding: 11px 13px; border: 0; border-bottom: 1px solid #253241;
@@ -765,11 +750,8 @@ h3 { font-size: 1rem; }
 
 @media (max-width: 1250px) {
   .game-layout.v3 { grid-template-columns: 225px minmax(470px, 1fr); }
-  .game-layout.v3.without-skill-nav { grid-template-columns: minmax(470px, 1fr) 286px; }
   .v3-status { grid-column: 1 / -1; max-height: none; overflow: visible; display: grid; grid-template-columns: 1fr 1fr 2fr; position: static; }
-  .game-layout.v3.without-skill-nav .v3-status { grid-column: auto; max-height: calc(100vh - 102px); overflow-y: auto; display: flex; position: sticky; }
   .v3-status .side-nav { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); }
-  .v3-status .save-state { min-height: 100%; }
   .power-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
@@ -777,7 +759,7 @@ h3 { font-size: 1rem; }
   .game-layout.v3 .command-nav { max-height: none; overflow: visible; }
   .game-layout.v3 .command-nav { order: 1; }
   .game-layout.v3 .play-column { order: 2; }
-  .game-layout.v3 .v3-status, .game-layout.v3.without-skill-nav .v3-status { display: none; }
+  .game-layout.v3 .v3-status { display: none; }
   .expanded-skills { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .expanded-skills .skill-button { min-height: 44px; }
   .v3-heading { display: grid; grid-template-columns: 1fr; }
