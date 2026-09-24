@@ -576,6 +576,11 @@ h3 { font-size: 1rem; }
 .expedition-status > svg { width: 28px; color: #6ec0d1; }
 .expedition-status h2 { margin-top: 3px; }
 .expedition-status span { color: #90a0ae; font-size: .8rem; }
+.expedition-sort { margin-bottom: 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.expedition-sort h2 { margin-top: 3px; }
+.expedition-sort p:not(.eyebrow) { margin-top: 4px; color: #8998a8; font-size: .8rem; }
+.expedition-sort label { display: grid; min-width: 168px; gap: 5px; color: #aebbc7; font-size: .72rem; font-weight: 700; }
+.expedition-sort [data-slot="select-trigger"] { width: 100%; border-radius: 0; border-color: #3a4b5f; color: #dce5ec; background: #101923; }
 .faction-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 10px; }
 .faction-strip > div { padding: 9px; min-width: 0; }
 .faction-strip small { display: block; min-height: 34px; color: #8493a1; font-size: .65rem; }
@@ -799,6 +804,8 @@ h3 { font-size: 1rem; }
   .character-record { grid-column: 1 / -1; }
   .settings-panel, .account-settings { grid-template-columns: 1fr; gap: 18px; padding: 16px; }
   .account-settings > a { width: 100%; }
+  .expedition-sort { align-items: stretch; flex-direction: column; }
+  .expedition-sort label { min-width: 0; width: 100%; }
   .v3-status .side-nav { display: grid; grid-template-columns: 1fr; }
   .mobile-nav.wide-mobile { grid-template-columns: repeat(6, 1fr); }
   .mobile-more-overlay { display: block; position: fixed; inset: 0; z-index: 60; }
