@@ -728,6 +728,16 @@ h3 { font-size: 1rem; }
 .profile-skill-grid strong { color: #dce5ec; font-size: .82rem; }
 .profile-skill-grid small { color: #8191a0; font: .66rem var(--font-mono); }
 .account-settings { grid-template-columns: 1fr auto; }
+.save-transfer-panel { align-items: start; }
+.save-transfer-controls { display: grid; gap: 8px; }
+.save-transfer-controls > label { color: #c8d1d9; font-size: .78rem; font-weight: 700; }
+.save-transfer-controls textarea { min-height: 132px; width: 100%; resize: vertical; padding: 10px; border: 1px solid #334354; border-radius: 0; outline: none; color: #dce5ec; background: #0c141d; font: .68rem/1.45 var(--font-mono); }
+.save-transfer-controls textarea:focus { border-color: #d9a94e; box-shadow: 0 0 0 2px #d9a94e22; }
+.save-transfer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.save-transfer-actions button { min-width: 0; }
+.save-transfer-controls small { color: #71808f; font: .68rem var(--font-mono); }
+.save-transfer-message.success { color: #79bd91; }
+.save-transfer-message.error { color: #e08888; }
 
 @media (max-width: 1250px) {
   .game-layout.v3 { grid-template-columns: 225px minmax(470px, 1fr); }

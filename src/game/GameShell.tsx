@@ -34,6 +34,21 @@ type OfflineReport = { seconds: number; actions: number; activity: string; gains
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
 const sectorById = Object.fromEntries(sectors.map((entry) => [entry.id, entry]));
 
+function encodeSave(state: GameState) {
+  const bytes = new TextEncoder().encode(JSON.stringify({ ...state, lastActiveAt: Date.now() }));
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function decodeSave(code: string) {
+  const normalized = code.replace(/\s/g, "");
+  if (!normalized) throw new Error("Missing save code");
+  const binary = atob(normalized);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return sanitizeGameState(JSON.parse(new TextDecoder().decode(bytes)));
+}
+
 const skillIcons: Record<SkillId, typeof Pickaxe> = {
   mining: Pickaxe, salvage: Recycle, botany: Biohazard, engineering: Wrench,
   science: FlaskConical, combat: Crosshair, astrogation: Compass, drones: Bot,
@@ -529,6 +544,16 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     });
   }, [queueSave]);
 
+  const loadSave = useCallback((next: GameState) => {
+    const loaded = { ...next, lastActiveAt: Date.now() };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setState(loaded);
+    stateRef.current = loaded;
+    setSelectedSkill(loaded.activeTask.skillId);
+    setOfflineReport(null);
+    persist(loaded);
+  }, [persist]);
+
   /* eslint-disable react-hooks/set-state-in-effect -- hydration imports browser-only guest state into the live game. */
   useEffect(() => {
     let base = initialState;
@@ -829,7 +854,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
         {view === "collection" ? <CollectionView state={state} /> : null}
         {view === "market" ? <MarketView state={state} now={now} getPrice={marketPrice} onTrade={trade} /> : null}
         {view === "outposts" ? <OutpostView state={state} onDevelop={developOutpost} /> : null}
-        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} /> : null}
+        {view === "character" ? <CharacterView state={state} fallbackName={activeAccountName} onSaveName={(name) => updateState((current) => ({ ...current, displayName: name, lastActiveAt: Date.now() }))} onLoadSave={loadSave} /> : null}
       </main>
 
       <aside className="status-column v3-status">
@@ -1158,13 +1183,38 @@ function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: 
   </div>;
 }
 
-function CharacterView({ state, fallbackName, onSaveName }: { state: GameState; fallbackName: string; onSaveName: (name: string) => void }) {
+function CharacterView({ state, fallbackName, onSaveName, onLoadSave }: { state: GameState; fallbackName: string; onSaveName: (name: string) => void; onLoadSave: (save: GameState) => void }) {
   const [name, setName] = useState(state.displayName || fallbackName);
+  const [saveCode, setSaveCode] = useState("");
+  const [saveMessage, setSaveMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
   const savedName = state.displayName || fallbackName;
   const initials = savedName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "SC";
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSaveName(name.trim().slice(0, 32));
+  };
+  const exportSave = () => {
+    setSaveCode(encodeSave(state));
+    setSaveMessage({ type: "success", text: "Save code created. Keep it somewhere safe before changing browsers or devices." });
+  };
+  const copySave = async () => {
+    if (!saveCode) return;
+    try {
+      await navigator.clipboard.writeText(saveCode);
+      setSaveMessage({ type: "success", text: "Save code copied to your clipboard." });
+    } catch {
+      setSaveMessage({ type: "error", text: "Copy was unavailable. Select the code above and copy it manually." });
+    }
+  };
+  const importSave = () => {
+    try {
+      const save = decodeSave(saveCode);
+      if (!window.confirm("Replace this browser's current Starfall Idle save? This cannot be undone unless you exported it first.")) return;
+      onLoadSave(save);
+      setSaveMessage({ type: "success", text: "Save loaded into this browser." });
+    } catch {
+      setSaveMessage({ type: "error", text: "That is not a valid Starfall Idle Base64 save code." });
+    }
   };
 
   return <div className="character-settings">
@@ -1190,6 +1240,16 @@ function CharacterView({ state, fallbackName, onSaveName }: { state: GameState; 
 
     <section className="settings-panel account-settings panel">
       <div><p className="eyebrow">LOCAL SAVE</p><h2>This browser only</h2><p>Your character progress is stored in this browser. Clearing site data or changing devices starts a separate save.</p></div>
+    </section>
+
+    <section className="settings-panel save-transfer-panel panel">
+      <div><p className="eyebrow">SAVE TRANSFER</p><h2>Base64 save code</h2><p>Create a portable copy of this character, then paste it here to load it on another browser or device.</p></div>
+      <div className="save-transfer-controls">
+        <label htmlFor="save-code">Save code</label>
+        <textarea id="save-code" value={saveCode} onChange={(event) => setSaveCode(event.target.value)} placeholder="Create a save code or paste one here" spellCheck={false} />
+        <div className="save-transfer-actions"><Button type="button" onClick={exportSave}>Create save code</Button><Button type="button" variant="outline" onClick={copySave} disabled={!saveCode}>Copy code</Button><Button type="button" variant="outline" onClick={importSave} disabled={!saveCode}>Load save</Button></div>
+        {saveMessage ? <small className={`save-transfer-message ${saveMessage.type}`}>{saveMessage.text}</small> : <small>Loading replaces the current save in this browser.</small>}
+      </div>
     </section>
   </div>;
 }
