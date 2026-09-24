@@ -28,7 +28,7 @@ import { Sprite } from "@/components/game/Sprite";
 import { CombatSprite } from "@/components/game/CombatSprite";
 import { advanceCombat, combatAttackProfile, combatPauseReason, prepareCombatEncounter, type CombatHooks } from "@/lib/combat-engine";
 
-type ViewId = "skills" | "bank" | "sectors" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "character" | "outposts";
+type ViewId = "skills" | "bank" | "sectors" | "bar" | "ship" | "crew" | "combat" | "expeditions" | "directives" | "research" | "collection" | "market" | "character" | "outposts";
 type OfflineReport = { seconds: number; actions: number; activity: string; gains: Record<string, number>; xp: number };
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
@@ -62,7 +62,7 @@ const navigation: { group: string; items: { id: ViewId; label: string; icon: typ
     { id: "ship", label: "Cruiser", icon: Rocket }, { id: "crew", label: "Crew", icon: Users },
   ] },
   { group: "Galaxy", items: [
-    { id: "sectors", label: "Star Chart", icon: Map }, { id: "expeditions", label: "Expeditions", icon: Compass },
+    { id: "sectors", label: "Star Chart", icon: Map }, { id: "bar", label: "Crew Bar", icon: Users }, { id: "expeditions", label: "Expeditions", icon: Compass },
     { id: "directives", label: "Directive Board", icon: ScrollText },
     { id: "market", label: "Market", icon: TrendingUp }, { id: "outposts", label: "Outposts", icon: Landmark },
   ] },
@@ -806,6 +806,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     skills: [skillMeta[selectedSkill].name, skillMeta[selectedSkill].description],
     bank: ["Cargo Bank", "Every material carried aboard the Aethelgard"],
     sectors: ["Star Chart", "Travel changes available resources, enemies and discoveries"],
+    bar: ["Crew Bar", "Recruit local specialists and configure the active crew"],
     ship: ["Aethelgard Cruiser", "Four decks, nine upgradeable ship systems"],
     crew: ["Crew Roster", "Review the ten specialists currently serving aboard the Aethelgard"],
     combat: ["Combat", ""],
@@ -860,7 +861,8 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
         {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
-        {view === "sectors" ? <SectorView state={state} onTravel={travel} onReplaceCrew={replaceCrew} /> : null}
+        {view === "sectors" ? <SectorView state={state} onTravel={travel} /> : null}
+        {view === "bar" ? <CrewBarView state={state} onReplaceCrew={replaceCrew} /> : null}
         {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onUpgradeEquipment={upgradeEquipment} onEquip={equipUniqueGear} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
         {view === "crew" ? <CrewView state={state} /> : null}
         {view === "combat" ? <CombatView state={state} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={startBestRepair} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onClearEffect={clearStatusEffect} /> : null}
@@ -885,7 +887,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
       <nav className="mobile-nav wide-mobile" aria-label="Game sections">
         <button className={view === "skills" ? "selected" : ""} onClick={() => openView("skills")}><Activity /><span>Skills</span></button>
         <button className={view === "ship" ? "selected" : ""} onClick={() => openView("ship")}><Rocket /><span>Ship</span></button>
-        <button className={view === "sectors" ? "selected" : ""} onClick={() => openView("sectors")}><Map /><span>Galaxy</span></button>
+        <button className={view === "sectors" || view === "bar" ? "selected" : ""} onClick={() => openView("sectors")}><Map /><span>Galaxy</span></button>
         <button className={view === "directives" ? "selected" : ""} onClick={() => openView("directives")}><ScrollText /><span>Directives</span></button>
         <button className={view === "bank" ? "selected" : ""} onClick={() => openView("bank")}><Boxes /><span>Bank</span></button>
         <button className={mobileMenuOpen ? "selected" : ""} onClick={() => setMobileMenuOpen(true)} aria-expanded={mobileMenuOpen}><Menu /><span>More</span></button>
@@ -926,7 +928,15 @@ function Bank({ state }: { state: GameState }) {
   return <div className="bank expanded panel"><div className="panel-heading"><div><p className="eyebrow">CARGO MANIFEST</p><h2>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} stored items</h2></div><PackageOpen /></div><div className="cargo-sections">{sections.map(([title, ids]) => <section key={title}><div className="collection-title"><h2>{title}</h2><span>{ids.reduce((total, id) => total + (state.inventory[id] ?? 0), 0)} units</span></div><div className="bank-grid">{ids.filter((id) => id in state.inventory).map((id) => <div key={id} className="bank-item"><Sprite kind="item" id={id} label={itemNames[id] ?? id} className="cargo-item-sprite" decorative /><div><small>{itemNames[id] ?? id}</small><strong>{fmt(state.inventory[id] ?? 0)}</strong></div></div>)}</div></section>)}</div></div>;
 }
 
-function SectorView({ state, onTravel, onReplaceCrew }: { state: GameState; onTravel: (id: string) => void; onReplaceCrew: (incomingId: string, outgoingId: string) => void }) {
+function SectorView({ state, onTravel }: { state: GameState; onTravel: (id: string) => void }) {
+  return <div className="sector-grid">{sectors.map((sector, index) => {
+    const unlocked = totalLevel(state) >= sector.level;
+    const fuel = Math.max(0, sector.fuel - (state.researchUnlocked.includes("phase-mapping") ? 1 : 0));
+    return <article key={sector.id} className={`sector-card panel ${state.sectorId === sector.id ? "current" : ""}`}><span className="sector-index">{String(index + 1).padStart(2, "0")}</span><div><p className="eyebrow">{sector.tone}</p><h2>{sector.name}</h2><p>{sector.description}</p><small>Requires total level {sector.level} · {fuel} Fuel Rods</small></div><Button disabled={!unlocked || state.sectorId === sector.id || state.inventory.fuelRod < fuel} onClick={() => onTravel(sector.id)}>{state.sectorId === sector.id ? "Current sector" : unlocked ? "Travel" : "Locked"}</Button></article>;
+  })}</div>;
+}
+
+function CrewBarView({ state, onReplaceCrew }: { state: GameState; onReplaceCrew: (incomingId: string, outgoingId: string) => void }) {
   const [selectedReplacement, setSelectedReplacement] = useState(state.activeCrewIds[0] ?? "");
   const replacementId = state.activeCrewIds.includes(selectedReplacement) ? selectedReplacement : state.activeCrewIds[0] ?? "";
   const activeCrew = state.activeCrewIds.map((id) => crewById[id]).filter(Boolean);
@@ -946,20 +956,13 @@ function SectorView({ state, onTravel, onReplaceCrew }: { state: GameState; onTr
       <Button disabled={active || !replacementId || (!recruited && !canHire)} onClick={() => onReplaceCrew(member.id, replacementId)}>{active ? action : !recruited && !canHire ? "Credits required" : action}</Button>
     </article>;
   };
-  return <>
-    <div className="sector-grid">{sectors.map((sector, index) => {
-    const unlocked = totalLevel(state) >= sector.level;
-    const fuel = Math.max(0, sector.fuel - (state.researchUnlocked.includes("phase-mapping") ? 1 : 0));
-    return <article key={sector.id} className={`sector-card panel ${state.sectorId === sector.id ? "current" : ""}`}><span className="sector-index">{String(index + 1).padStart(2, "0")}</span><div><p className="eyebrow">{sector.tone}</p><h2>{sector.name}</h2><p>{sector.description}</p><small>Requires total level {sector.level} · {fuel} Fuel Rods</small></div><Button disabled={!unlocked || state.sectorId === sector.id || state.inventory.fuelRod < fuel} onClick={() => onTravel(sector.id)}>{state.sectorId === sector.id ? "Current sector" : unlocked ? "Travel" : "Locked"}</Button></article>;
-    })}</div>
-    <section className="crew-bar panel">
+  return <section className="crew-bar panel">
       <header className="crew-bar-heading"><div><p className="eyebrow">{currentSector?.name.toUpperCase()} · CREW BAR</p><h2>Hire specialists and shape your ship.</h2><p>Choose an active crew member to move to reserve, then hire a local specialist or return someone already aboard.</p></div><div className="crew-bar-credits"><Coins /><span>Available credits</span><strong>{fmt(state.credits)}</strong></div></header>
       <div className="crew-bar-selector"><label><span>Replace active crew member</span><Select value={replacementId} onValueChange={setSelectedReplacement}><SelectTrigger aria-label="Active crew member to replace"><SelectValue /></SelectTrigger><SelectContent>{activeCrew.map((member) => <SelectItem key={member.id} value={member.id}>{member.name} · {skillMeta[member.primarySkill].name}</SelectItem>)}</SelectContent></Select></label><p>{replacementId ? <><strong>{crewById[replacementId]?.name}</strong> will move to reserve. All service XP and loyalty are retained.</> : "Select an active crew member to begin a change."}</p></div>
       <div className="section-label"><p className="eyebrow">LOCAL APPLICANTS</p><h2>Five specialists at this bar</h2></div>
       <div className="bar-crew-grid">{currentCandidates.map((member) => renderCrewCard(member, "candidate"))}</div>
       {reserveCrew.length ? <><div className="section-label"><p className="eyebrow">YOUR RESERVE</p><h2>Return a previous crewmate</h2></div><div className="bar-crew-grid">{reserveCrew.map((member) => renderCrewCard(member, "reserve"))}</div></> : null}
-    </section>
-  </>;
+    </section>;
 }
 
 function ShipView({ state, onUpgrade, onUpgradeEquipment, onEquip, onPowerMode, onBuildDrone, onBuildVehicle }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onUpgradeEquipment: (id: EquipmentId) => void; onEquip: (id: string) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
