@@ -177,18 +177,73 @@ export const shipModules: Record<ShipModuleId, { name: string; description: stri
   hangar: { name: "Vehicle & Drone Bay", description: "Deck 3 storage and launch support for two rovers and the ship's drone swarms.", effect: (level) => `+${level} Drones output.` },
 };
 
-export const crew = [
-  { id: "mara", name: "Mara Venn", role: "Captain", trait: "Steady Hand", specialties: ["astrogation", "diplomacy"] as SkillId[], bio: "A former convoy commander who keeps a cold bridge and a warmer crew.", perk: "Command instinct: +1 output in Astrogation or Diplomacy." },
-  { id: "jonas", name: "Jonas Rhee", role: "Chief Engineer", trait: "Improviser", specialties: ["engineering", "metallurgy"] as SkillId[], bio: "He can rebuild a failed coil from a cargo latch and a bad idea.", perk: "Fabricator’s eye: +1 output in Engineering or Metallurgy." },
-  { id: "priya", name: "Priya Nadir", role: "Science Officer", trait: "Pattern Seeker", specialties: ["science", "archaeology"] as SkillId[], bio: "Priya reads dead signals as if they were unfinished conversations.", perk: "Signal literacy: +1 output in Science or Archaeology." },
-  { id: "okafor", name: "Dr Okafor", role: "Medical Officer", trait: "Calm Under Fire", specialties: ["medicine", "biochemistry"] as SkillId[], bio: "A field surgeon who treats every emergency as a solvable equation.", perk: "Clinical discipline: +1 output in Medicine or Biochemistry." },
-  { id: "sol", name: "Sol Mercer", role: "Tactical Officer", trait: "Deadeye", specialties: ["combat"] as SkillId[], bio: "Sol studies engagement footage until every escape vector becomes familiar.", perk: "Target lock: +1 Combat output." },
-  { id: "mei", name: "Mei Navarro", role: "Xenobotanist", trait: "Green Thumb", specialties: ["botany", "biochemistry"] as SkillId[], bio: "Mei keeps a forbidden seed archive behind the hydroponics bulkhead.", perk: "Closed-loop cultivation: +1 output in Xenobotany or Biochemistry." },
-  { id: "rook", name: "Rook-7", role: "Drone Controller", trait: "Parallel Mind", specialties: ["drones", "mining"] as SkillId[], bio: "An ex-industrial control unit learning to enjoy the sound of a living crew.", perk: "Swarm intuition: +1 output in Drone Command or Mining." },
-  { id: "elias", name: "Elias Ward", role: "Quartermaster", trait: "Nothing Wasted", specialties: ["logistics", "diplomacy"] as SkillId[], bio: "Elias knows every crate, favour and spare ration on the cruiser by memory.", perk: "Supply sense: +1 output in Logistics or Diplomacy." },
-  { id: "vega", name: "Vega Holt", role: "Salvage Lead", trait: "Voidwalker", specialties: ["salvage", "mining"] as SkillId[], bio: "Vega is happiest outside the hull with a cutter and a very short tether.", perk: "Wreck sense: +1 output in Salvage or Mining." },
-  { id: "anya", name: "Anya Sato", role: "Archaeologist", trait: "Old Languages", specialties: ["archaeology", "science"] as SkillId[], bio: "Anya can identify a civilisation from a hinge, a glyph or a burial pattern.", perk: "Contextual recall: +1 output in Archaeology or Science." },
+export type CrewMember = {
+  id: string;
+  name: string;
+  role: string;
+  trait: string;
+  primarySkill: SkillId;
+  specialties: SkillId[];
+  bio: string;
+  perk: string;
+  sectorId?: string;
+  hireCost?: number;
+};
+
+export const crew: CrewMember[] = [
+  { id: "mara", name: "Mara Venn", role: "Captain", trait: "Steady Hand", primarySkill: "astrogation", specialties: ["astrogation", "diplomacy"], bio: "A former convoy commander who keeps a cold bridge and a warmer crew.", perk: "Command instinct: a level-based Astrogation output bonus." },
+  { id: "jonas", name: "Jonas Rhee", role: "Chief Engineer", trait: "Improviser", primarySkill: "engineering", specialties: ["engineering", "metallurgy"], bio: "He can rebuild a failed coil from a cargo latch and a bad idea.", perk: "Fabricator’s eye: a level-based Engineering output bonus." },
+  { id: "priya", name: "Priya Nadir", role: "Science Officer", trait: "Pattern Seeker", primarySkill: "science", specialties: ["science", "archaeology"], bio: "Priya reads dead signals as if they were unfinished conversations.", perk: "Signal literacy: a level-based Science output bonus." },
+  { id: "okafor", name: "Dr Okafor", role: "Medical Officer", trait: "Calm Under Fire", primarySkill: "medicine", specialties: ["medicine", "biochemistry"], bio: "A field surgeon who treats every emergency as a solvable equation.", perk: "Clinical discipline: a level-based Medicine output bonus." },
+  { id: "sol", name: "Sol Mercer", role: "Tactical Officer", trait: "Deadeye", primarySkill: "combat", specialties: ["combat"], bio: "Sol studies engagement footage until every escape vector becomes familiar.", perk: "Target lock: a level-based Combat output bonus." },
+  { id: "mei", name: "Mei Navarro", role: "Xenobotanist", trait: "Green Thumb", primarySkill: "botany", specialties: ["botany", "biochemistry"], bio: "Mei keeps a forbidden seed archive behind the hydroponics bulkhead.", perk: "Closed-loop cultivation: a level-based Xenobotany output bonus." },
+  { id: "rook", name: "Rook-7", role: "Drone Controller", trait: "Parallel Mind", primarySkill: "drones", specialties: ["drones", "mining"], bio: "An ex-industrial control unit learning to enjoy the sound of a living crew.", perk: "Swarm intuition: a level-based Drone Command output bonus." },
+  { id: "elias", name: "Elias Ward", role: "Quartermaster", trait: "Nothing Wasted", primarySkill: "logistics", specialties: ["logistics", "diplomacy"], bio: "Elias knows every crate, favour and spare ration on the cruiser by memory.", perk: "Supply sense: a level-based Logistics output bonus." },
+  { id: "vega", name: "Vega Holt", role: "Salvage Lead", trait: "Voidwalker", primarySkill: "salvage", specialties: ["salvage", "mining"], bio: "Vega is happiest outside the hull with a cutter and a very short tether.", perk: "Wreck sense: a level-based Salvage output bonus." },
+  { id: "anya", name: "Anya Sato", role: "Archaeologist", trait: "Old Languages", primarySkill: "archaeology", specialties: ["archaeology", "science"], bio: "Anya can identify a civilisation from a hinge, a glyph or a burial pattern.", perk: "Contextual recall: a level-based Archaeology output bonus." },
 ];
+
+const sectorCrew = (sectorId: string, hireCost: number, entries: Omit<CrewMember, "sectorId" | "hireCost">[]): CrewMember[] => entries.map((entry) => ({ ...entry, sectorId, hireCost }));
+
+export const recruitableCrew: CrewMember[] = [
+  ...sectorCrew("erebus", 150, [
+    { id: "kest", name: "Kest Arlow", role: "Miner", trait: "Stone Sense", primarySkill: "mining", specialties: ["mining"], bio: "A belt-born extractor who can hear a stressed rock seam before the scanners do.", perk: "Deep cut: a level-based Mining output bonus." },
+    { id: "sable", name: "Sable Korr", role: "Metallurgist", trait: "Hot Hand", primarySkill: "metallurgy", specialties: ["metallurgy"], bio: "A refinery hand with a talent for turning poor feedstock into clean alloy.", perk: "Pure yield: a level-based Metallurgy output bonus." },
+    { id: "nadi", name: "Nadi Quell", role: "Biochemist", trait: "Clean Room", primarySkill: "biochemistry", specialties: ["biochemistry"], bio: "A practical chemist whose compact lab never seems to run out of sterile glass.", perk: "Stable cultures: a level-based Biochemistry output bonus." },
+    { id: "dara", name: "Dara Voss", role: "Envoy", trait: "Open Channel", primarySkill: "diplomacy", specialties: ["diplomacy"], bio: "A union representative who knows which frontier promises are worth recording.", perk: "Good faith: a level-based Diplomacy output bonus." },
+    { id: "miko", name: "Miko Renn", role: "Loadmaster", trait: "Fast Ledger", primarySkill: "logistics", specialties: ["logistics"], bio: "A freight runner who can rebalance a cargo bay before the alarm finishes sounding.", perk: "Rapid manifest: a level-based Logistics output bonus." },
+  ]),
+  ...sectorCrew("helix", 400, [
+    { id: "iora", name: "Iora Bell", role: "Xenobotanist", trait: "Sporewise", primarySkill: "botany", specialties: ["botany"], bio: "A Helix conservator with a careful eye for organisms that should not be thriving.", perk: "Living archive: a level-based Xenobotany output bonus." },
+    { id: "soren", name: "Soren Vale", role: "Researcher", trait: "Methodical", primarySkill: "science", specialties: ["science"], bio: "A quarantine scientist who writes cleaner hypotheses than most people write messages.", perk: "Controlled study: a level-based Science output bonus." },
+    { id: "tamsin", name: "Tamsin Ro", role: "Medic", trait: "Triage Eye", primarySkill: "medicine", specialties: ["medicine"], bio: "A relief physician who turns every cramped compartment into a workable clinic.", perk: "Field care: a level-based Medicine output bonus." },
+    { id: "oren", name: "Oren Lyre", role: "Archaeologist", trait: "Patient Reader", primarySkill: "archaeology", specialties: ["archaeology"], bio: "A records diver who traces old lab projects through their discarded instrumentation.", perk: "Evidence trail: a level-based Archaeology output bonus." },
+    { id: "ves", name: "Ves Kaito", role: "Biochemist", trait: "Adaptive", primarySkill: "biochemistry", specialties: ["biochemistry"], bio: "A synthetic biologist specialising in medicines that survive alien environments.", perk: "Adaptive compounds: a level-based Biochemistry output bonus." },
+  ]),
+  ...sectorCrew("cinder", 900, [
+    { id: "brin", name: "Brin Dax", role: "Tactical Specialist", trait: "Quick Draw", primarySkill: "combat", specialties: ["combat"], bio: "A retired escort gunner who still measures every room by lines of fire.", perk: "Hard sight: a level-based Combat output bonus." },
+    { id: "yara", name: "Yara Cind", role: "Drone Pilot", trait: "Split Focus", primarySkill: "drones", specialties: ["drones"], bio: "A corsair defector who can fly a swarm through a debris field by instinct.", perk: "Swarm weave: a level-based Drone Command output bonus." },
+    { id: "tor", name: "Tor Ashen", role: "Miner", trait: "Risk Taker", primarySkill: "mining", specialties: ["mining"], bio: "An asteroid breaker who favours volatile seams and very short safety briefings.", perk: "Hot seam: a level-based Mining output bonus." },
+    { id: "linn", name: "Linn Sable", role: "Diplomat", trait: "Streetwise", primarySkill: "diplomacy", specialties: ["diplomacy"], bio: "A fixer with enough Cinder contacts to make a truce feel like a bargain.", perk: "Back-channel: a level-based Diplomacy output bonus." },
+    { id: "garr", name: "Garr Flint", role: "Metallurgist", trait: "Iron Will", primarySkill: "metallurgy", specialties: ["metallurgy"], bio: "A furnace supervisor who knows exactly how hard to push an overworked crucible.", perk: "Forge rhythm: a level-based Metallurgy output bonus." },
+  ]),
+  ...sectorCrew("orpheus", 1800, [
+    { id: "cel", name: "Cel Rian", role: "Navigator", trait: "Still Nerve", primarySkill: "astrogation", specialties: ["astrogation"], bio: "A rift pilot who trusts instruments even when time itself disagrees with them.", perk: "True vector: a level-based Astrogation output bonus." },
+    { id: "pax", name: "Pax Ilyan", role: "Engineer", trait: "Phasewise", primarySkill: "engineering", specialties: ["engineering"], bio: "A field engineer who treats temporal distortion as another maintenance variable.", perk: "Rift repair: a level-based Engineering output bonus." },
+    { id: "aeri", name: "Aeri Moss", role: "Scientist", trait: "Far Sight", primarySkill: "science", specialties: ["science"], bio: "A physicist collecting data from phenomena that are gone before they are observed.", perk: "Phase reading: a level-based Science output bonus." },
+    { id: "dell", name: "Dell Harrow", role: "Quartermaster", trait: "Margin Call", primarySkill: "logistics", specialties: ["logistics"], bio: "A supply chief who can schedule cargo around a corridor that has not happened yet.", perk: "Timed delivery: a level-based Logistics output bonus." },
+    { id: "rhea", name: "Rhea Gault", role: "Metallurgist", trait: "Cold Forge", primarySkill: "metallurgy", specialties: ["metallurgy"], bio: "A materials specialist refining alloys that remember the pressure that made them.", perk: "Phase temper: a level-based Metallurgy output bonus." },
+  ]),
+  ...sectorCrew("silent", 3600, [
+    { id: "nox", name: "Nox Eren", role: "Archaeologist", trait: "Machine Ear", primarySkill: "archaeology", specialties: ["archaeology"], bio: "A Sentinel scholar who listens for meaning in the cadence of dormant machinery.", perk: "Silent context: a level-based Archaeology output bonus." },
+    { id: "thea", name: "Thea Marr", role: "Biochemist", trait: "Unfazed", primarySkill: "biochemistry", specialties: ["biochemistry"], bio: "A xenomedical specialist who has made peace with impossibly old organic systems.", perk: "Void culture: a level-based Biochemistry output bonus." },
+    { id: "quill", name: "Quill Sorn", role: "Envoy", trait: "Measured Voice", primarySkill: "diplomacy", specialties: ["diplomacy"], bio: "A negotiator who approaches machine intelligences with patience rather than assumptions.", perk: "Signal accord: a level-based Diplomacy output bonus." },
+    { id: "kira", name: "Kira Fen", role: "Tactical Specialist", trait: "Cold Focus", primarySkill: "combat", specialties: ["combat"], bio: "A Sentinel-zone scout whose calm makes hostile targeting data feel almost routine.", perk: "Quiet lock: a level-based Combat output bonus." },
+    { id: "unit-9", name: "Unit-9", role: "Drone Pilot", trait: "Distributed Mind", primarySkill: "drones", specialties: ["drones"], bio: "A recovered service intelligence that choreographs drones with precise, wordless signals.", perk: "Machine chorus: a level-based Drone Command output bonus." },
+  ]),
+];
+
+export const allCrew = [...crew, ...recruitableCrew];
 
 export const droneSpecs: Record<DroneId, { name: string; description: string; effect: (count: number) => string; cost: Record<string, number> }> = {
   mining: { name: "Mining Drone", description: "Autonomous ore-cutting support for mining crews.", effect: (count) => `+${count} Mining output.`, cost: { droneParts: 3, powerCell: 1 } },

@@ -278,6 +278,36 @@ const migrated = sanitizeGameState(legacy);
 assert.equal(migrated.combat.encounter, null);
 assert.ok(Number.isInteger(migrated.combat.randomSeed));
 assert.deepEqual(migrated.combat.hits, []);
+
+// Crew-bar migration keeps legacy specialists and their service records while removing editable postings.
+const legacyCrewSave = defaultGameState();
+legacyCrewSave.version = 5;
+legacyCrewSave.crewAssignments = { mara: "diplomacy", sol: "combat" };
+delete legacyCrewSave.activeCrewIds;
+delete legacyCrewSave.recruitedCrewIds;
+legacyCrewSave.crewXp.mara = 725;
+legacyCrewSave.crewLoyalty.mara = 87;
+const migratedCrew = sanitizeGameState(legacyCrewSave);
+assert.equal(migratedCrew.activeCrewIds.length, 10);
+assert.equal(new Set(migratedCrew.activeCrewIds).size, 10);
+assert.deepEqual(migratedCrew.activeCrewIds, ["mara", "jonas", "priya", "okafor", "sol", "mei", "rook", "elias", "vega", "anya"]);
+assert.equal(migratedCrew.crewXp.mara, 725);
+assert.equal(migratedCrew.crewLoyalty.mara, 87);
+assert.equal("crewAssignments" in migratedCrew, false);
+
+// Recruited specialists persist in the roster and malformed duplicate active entries cannot displace slots.
+const crewBarSave = sanitizeGameState({
+  ...defaultGameState(),
+  recruitedCrewIds: ["kest", "kest"],
+  activeCrewIds: ["kest", "kest", "jonas", "priya", "okafor", "sol", "mei", "rook", "elias", "vega", "anya"],
+  crewXp: { kest: 120 },
+  crewLoyalty: { kest: 65 },
+});
+assert.equal(crewBarSave.activeCrewIds.length, 10);
+assert.equal(new Set(crewBarSave.activeCrewIds).size, 10);
+assert.ok(crewBarSave.recruitedCrewIds.includes("kest"));
+assert.equal(crewBarSave.crewXp.kest, 120);
+assert.equal(crewBarSave.crewLoyalty.kest, 65);
 for (const elapsed of [-100, 0, Number.NaN, Number.POSITIVE_INFINITY]) {
   state = prepared();
   result = step(state, elapsed);

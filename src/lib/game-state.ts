@@ -16,6 +16,14 @@ export type CombatStance = "balanced" | "aggressive" | "defensive";
 export type PowerMode = "balanced" | "industrial" | "research" | "combat" | "navigation";
 export type StatusEffect = "radiation" | "hullBreach" | "sensorDisruption" | "overheating";
 export type OutpostType = "mining" | "research" | "trade";
+export const ACTIVE_CREW_SLOTS = 10;
+export const STARTING_CREW_IDS = ["mara", "jonas", "priya", "okafor", "sol", "mei", "rook", "elias", "vega", "anya"] as const;
+const KNOWN_CREW_IDS = [
+  ...STARTING_CREW_IDS,
+  "kest", "sable", "nadi", "dara", "miko", "iora", "soren", "tamsin", "oren", "ves",
+  "brin", "yara", "tor", "linn", "garr", "cel", "pax", "aeri", "dell", "rhea",
+  "nox", "thea", "quill", "kira", "unit-9",
+] as const;
 export type CombatEncounter = {
   targetId: string;
   enemyHull: number;
@@ -50,7 +58,7 @@ export type CombatState = {
 };
 
 export type GameState = {
-  version: 5;
+  version: 6;
   displayName: string;
   credits: number;
   skills: Record<SkillId, SkillProgress>;
@@ -66,7 +74,8 @@ export type GameState = {
   lastActiveAt: number;
   sectorId: string;
   shipModules: Record<ShipModuleId, number>;
-  crewAssignments: Record<string, SkillId>;
+  activeCrewIds: string[];
+  recruitedCrewIds: string[];
   crewXp: Record<string, number>;
   crewLoyalty: Record<string, number>;
   crewMorale: number;
@@ -159,7 +168,7 @@ export function defaultGameState(): GameState {
   const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, { xp: 0, level: 1 }])) as Record<SkillId, SkillProgress>;
   const mastery = Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>;
   return {
-    version: 5,
+    version: 6,
     displayName: "",
     credits: 180,
     skills,
@@ -175,12 +184,10 @@ export function defaultGameState(): GameState {
     lastActiveAt: Date.now(),
     sectorId: "erebus",
     shipModules: { bridge: 1, cic: 1, cargo: 1, hydroponics: 1, fabricator: 1, lab: 1, medbay: 1, reactor: 1, hangar: 1 },
-    crewAssignments: {
-      mara: "astrogation", jonas: "engineering", priya: "science", okafor: "medicine", sol: "combat",
-      mei: "botany", rook: "drones", elias: "logistics", vega: "salvage", anya: "archaeology",
-    },
-    crewXp: { mara: 0, jonas: 0, priya: 0, okafor: 0, sol: 0, mei: 0, rook: 0, elias: 0, vega: 0, anya: 0 },
-    crewLoyalty: { mara: 50, jonas: 50, priya: 50, okafor: 50, sol: 50, mei: 50, rook: 50, elias: 50, vega: 50, anya: 50 },
+    activeCrewIds: [...STARTING_CREW_IDS],
+    recruitedCrewIds: [...STARTING_CREW_IDS],
+    crewXp: Object.fromEntries(KNOWN_CREW_IDS.map((id) => [id, 0])),
+    crewLoyalty: Object.fromEntries(KNOWN_CREW_IDS.map((id) => [id, 50])),
     crewMorale: 80,
     powerMode: "balanced",
     outposts: {},
@@ -227,6 +234,23 @@ function looseNumericRecord(value: unknown, max = 10_000_000) {
   return Object.fromEntries(Object.entries(input).filter(([key]) => key.length < 100).slice(0, 500).map(([key, amount]) => [key, boundedNumber(amount, 0, max)]));
 }
 
+function crewIdList(value: unknown) {
+  return Array.from(new Set(stringList(value, KNOWN_CREW_IDS.length).filter((id) => (KNOWN_CREW_IDS as readonly string[]).includes(id))));
+}
+
+function crewRecord(value: unknown, fallback: number, max: number) {
+  const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return Object.fromEntries(KNOWN_CREW_IDS.map((id) => [id, boundedNumber(input[id], fallback, max)]));
+}
+
+function sanitizeCrewRoster(input: Record<string, unknown>) {
+  const requestedRecruits = crewIdList(input.recruitedCrewIds);
+  const recruited = Array.from(new Set([...STARTING_CREW_IDS, ...requestedRecruits]));
+  const requestedActive = crewIdList(input.activeCrewIds).filter((id) => recruited.includes(id));
+  const active = Array.from(new Set([...requestedActive, ...STARTING_CREW_IDS.filter((id) => recruited.includes(id)), ...recruited])).slice(0, ACTIVE_CREW_SLOTS);
+  return { active, recruited };
+}
+
 function sanitizeCombatEncounter(value: unknown, activeTaskId: unknown): CombatEncounter | null {
   if (!value || typeof value !== "object") return null;
   const encounter = value as Record<string, unknown>;
@@ -256,7 +280,7 @@ export function sanitizeGameState(value: unknown): GameState {
   const expeditionInput = input.activeExpedition && typeof input.activeExpedition === "object" ? input.activeExpedition as Record<string, unknown> : null;
   const combatInput = input.combat && typeof input.combat === "object" ? input.combat as Record<string, unknown> : {};
   const victoriesInput = combatInput.victories && typeof combatInput.victories === "object" ? combatInput.victories as Record<string, unknown> : {};
-  const saveVersion = boundedNumber(input.version, 0, 5);
+  const saveVersion = boundedNumber(input.version, 0, 6);
   const outpostsInput = input.outposts && typeof input.outposts === "object" ? input.outposts as Record<string, unknown> : {};
 
   const skills = Object.fromEntries(SKILL_IDS.map((id) => {
@@ -274,9 +298,10 @@ export function sanitizeGameState(value: unknown): GameState {
   const rawSkillId = SKILL_IDS.includes(taskInput.skillId as SkillId) ? taskInput.skillId as SkillId : "mining";
   const legacyCombatTask = rawSkillId === "combat" && typeof taskInput.activityId === "string" ? taskInput.activityId.slice(0, 80) : null;
   const skillId: SkillId = rawSkillId === "combat" ? "mining" : rawSkillId;
+  const roster = sanitizeCrewRoster(input);
 
   return {
-    version: 5,
+    version: 6,
     displayName: typeof input.displayName === "string" ? input.displayName.trim().slice(0, 32) : "",
     credits: boundedNumber(input.credits, defaults.credits),
     skills,
@@ -301,14 +326,10 @@ export function sanitizeGameState(value: unknown): GameState {
     lastActiveAt: boundedNumber(input.lastActiveAt, Date.now(), Date.now() + 60_000),
     sectorId: typeof input.sectorId === "string" ? input.sectorId.slice(0, 50) : defaults.sectorId,
     shipModules: numericRecord(input.shipModules, defaults.shipModules, 50),
-    crewAssignments: {
-      ...defaults.crewAssignments,
-      ...(input.crewAssignments && typeof input.crewAssignments === "object"
-        ? Object.fromEntries(Object.entries(input.crewAssignments as Record<string, unknown>).filter(([, id]) => SKILL_IDS.includes(id as SkillId))) as Record<string, SkillId>
-        : {}),
-    },
-    crewXp: numericRecord(input.crewXp, defaults.crewXp, 10_000_000),
-    crewLoyalty: numericRecord(input.crewLoyalty, defaults.crewLoyalty, 100),
+    activeCrewIds: roster.active,
+    recruitedCrewIds: roster.recruited,
+    crewXp: crewRecord(input.crewXp, 0, 10_000_000),
+    crewLoyalty: crewRecord(input.crewLoyalty, 50, 100),
     crewMorale: boundedNumber(input.crewMorale, defaults.crewMorale, 100),
     powerMode: ["balanced", "industrial", "research", "combat", "navigation"].includes(String(input.powerMode)) ? input.powerMode as PowerMode : "balanced",
     outposts: Object.fromEntries(Object.entries(outpostsInput).filter(([sectorId, value]) => ["erebus", "helix", "cinder", "orpheus", "silent"].includes(sectorId) && value && typeof value === "object").map(([sectorId, value]) => {

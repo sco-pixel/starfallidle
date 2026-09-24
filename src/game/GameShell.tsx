@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  activities, collectionEntries, contracts, crew, droneSpecs, equipmentSpecs,
+  activities, allCrew, collectionEntries, contracts, droneSpecs, equipmentSpecs, recruitableCrew,
   expeditions, itemNames, researchNodes, sectors, shipModules, skillMeta, vehicleSpecs,
   storyEvents, totalLevel, type Activity as SkillActivity,
 } from "@/lib/game-content";
@@ -33,6 +33,7 @@ type OfflineReport = { seconds: number; actions: number; activity: string; gains
 
 const activityById = Object.fromEntries(activities.map((entry) => [entry.id, entry])) as Record<string, SkillActivity>;
 const sectorById = Object.fromEntries(sectors.map((entry) => [entry.id, entry]));
+const crewById = Object.fromEntries(allCrew.map((member) => [member.id, member]));
 
 const skillIcons: Record<SkillId, typeof Pickaxe> = {
   mining: Pickaxe, salvage: Recycle, botany: Biohazard, engineering: Wrench,
@@ -167,7 +168,10 @@ function addItems(inventory: Record<string, number>, rewards: Record<string, num
   return next;
 }
 function crewCount(state: GameState, skillId: SkillId) {
-  return Object.values(state.crewAssignments).filter((id) => id === skillId).length;
+  return state.activeCrewIds.filter((id) => crewById[id]?.primarySkill === skillId).length;
+}
+function activeCrewMember(state: GameState, id: string, skillId?: SkillId) {
+  return state.activeCrewIds.includes(id) && (!skillId || crewById[id]?.primarySkill === skillId);
 }
 const weaponNames = { laser: "Pulse Laser", railgun: "Kinetic Railgun", missile: "Guided Missiles" } as const;
 const stanceNames = { balanced: "Balanced", aggressive: "Aggressive", defensive: "Defensive" } as const;
@@ -178,7 +182,7 @@ function combatHitChance(state: GameState, activity: SkillActivity) {
   const systems = state.equipment.railgun * 2 + state.shipModules.cic + state.drones.combat;
   const gear = state.equippedGear === "gearPhaseLance" ? 12 : state.equippedGear === "gearStarfallCrown" ? 6 : 0;
   const disruption = state.statusEffects.includes("sensorDisruption") ? -8 : 0;
-  const tacticalOfficer = state.crewAssignments.sol === "combat" ? 5 : 0;
+  const tacticalOfficer = activeCrewMember(state, "sol", "combat") ? 5 : 0;
   return Math.max(45, Math.min(99, 78 + weaponTracking + training + systems + gear + disruption + tacticalOfficer - activity.enemy.evasion));
 }
 function combatMatchup(state: GameState, activity: SkillActivity) {
@@ -205,9 +209,9 @@ function actionSeconds(state: GameState, activity: SkillActivity) {
 function outputBonus(state: GameState, activity: SkillActivity) {
   const skillId = activity.skillId;
   let bonus = Math.floor(crewCount(state, skillId) / 2);
-  bonus += crew.reduce((total, member) => {
+  bonus += allCrew.reduce((total, member) => {
     const level = crewLevel(state.crewXp[member.id] ?? 0);
-    return total + (state.crewAssignments[member.id] === skillId && member.specialties.includes(skillId) ? 1 + Math.floor((level - 1) / 20) : 0);
+    return total + (activeCrewMember(state, member.id, skillId) ? 1 + Math.floor((level - 1) / 20) : 0);
   }, 0);
   bonus += Math.floor(state.mastery[skillId] / 250);
   if ((state.operationMastery[activity.id] ?? 0) >= 100) bonus += 1;
@@ -240,8 +244,8 @@ function combatDamage(state: GameState, activity: SkillActivity) {
   const bossAnalysis = state.researchUnlocked.includes("boss-analysis") && activity.enemy?.class.includes("Boss") ? 0.85 : 1;
   const unique = state.equippedGear === "gearLivingBulwark" ? 0.85 : state.equippedGear === "gearStarfallCrown" ? 0.925 : 1;
   const breach = state.statusEffects.includes("hullBreach") ? 1.18 : 1;
-  const droneController = state.crewAssignments.rook === "drones" ? Math.min(4, state.drones.combat) : 0;
-  const chiefEngineer = state.crewAssignments.jonas === "engineering" ? 1 : 0;
+  const droneController = activeCrewMember(state, "rook", "drones") ? Math.min(4, state.drones.combat) : 0;
+  const chiefEngineer = activeCrewMember(state, "jonas", "engineering") ? 1 : 0;
   return Math.max(1, Math.floor((activity.damage - mitigation - droneController - chiefEngineer) * protocol * stance * veteran * bossAnalysis * unique * breach));
 }
 function activityCosts(state: GameState, activity: SkillActivity) {
@@ -365,7 +369,7 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
   if (activity.skillId === "engineering") statusEffects = statusEffects.filter((effect) => effect !== "hullBreach");
   if (activity.skillId === "science") statusEffects = statusEffects.filter((effect) => effect !== "sensorDisruption");
   if (activity.skillId === "metallurgy") statusEffects = statusEffects.filter((effect) => effect !== "overheating");
-  const assignedCrew = Object.entries(state.crewAssignments).filter(([, skill]) => skill === activity.skillId).map(([id]) => id);
+  const assignedCrew = state.activeCrewIds.filter((id) => crewById[id]?.primarySkill === activity.skillId);
   const crewXp = { ...state.crewXp };
   const crewLoyalty = { ...state.crewLoyalty };
   assignedCrew.forEach((id) => {
@@ -650,9 +654,21 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     return { ...current, inventory: spend(current.inventory, cost), vehicles: { ...current.vehicles, [id]: current.vehicles[id] + 1 }, lastActiveAt: Date.now() };
   });
 
-  const assignCrew = (id: string, skillId: SkillId) => updateState((current) => ({
-    ...current, crewAssignments: { ...current.crewAssignments, [id]: skillId }, lastActiveAt: Date.now(),
-  }));
+  const replaceCrew = (incomingId: string, outgoingId: string) => updateState((current) => {
+    const incoming = crewById[incomingId];
+    if (!incoming || !current.activeCrewIds.includes(outgoingId) || current.activeCrewIds.includes(incomingId)) return current;
+    const alreadyRecruited = current.recruitedCrewIds.includes(incomingId);
+    if (!alreadyRecruited && (incoming.sectorId !== current.sectorId || current.credits < (incoming.hireCost ?? 0))) return current;
+    const hireCost = alreadyRecruited ? 0 : incoming.hireCost ?? 0;
+    return {
+      ...current,
+      credits: current.credits - hireCost,
+      activeCrewIds: current.activeCrewIds.map((id) => id === outgoingId ? incomingId : id),
+      recruitedCrewIds: alreadyRecruited ? current.recruitedCrewIds : [...current.recruitedCrewIds, incomingId],
+      storyLog: [`${incoming.name} ${alreadyRecruited ? "returned to" : "joined"} the active crew.`, ...current.storyLog].slice(0, 100),
+      lastActiveAt: Date.now(),
+    };
+  });
 
   const unlockResearch = (id: string) => updateState((current) => {
     const node = researchNodes.find((entry) => entry.id === id);
@@ -766,7 +782,7 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     bank: ["Cargo Bank", "Every material carried aboard the Aethelgard"],
     sectors: ["Star Chart", "Travel changes available resources, enemies and discoveries"],
     ship: ["Aethelgard Cruiser", "Four decks, nine upgradeable ship systems"],
-    crew: ["Crew Roster", "Assign ten specialists to support the skills you value"],
+    crew: ["Crew Roster", "Review the ten specialists currently serving aboard the Aethelgard"],
     combat: ["Combat", ""],
     expeditions: ["Expeditions", "Prepare supplies and send teams on longer operations"],
     directives: ["Directive Board", "Active contracts, sector objectives and long-form missions in one place"],
@@ -819,9 +835,9 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
         {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
-        {view === "sectors" ? <SectorView state={state} onTravel={travel} /> : null}
+        {view === "sectors" ? <SectorView state={state} onTravel={travel} onReplaceCrew={replaceCrew} /> : null}
         {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onUpgradeEquipment={upgradeEquipment} onEquip={equipUniqueGear} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
-        {view === "crew" ? <CrewView state={state} onAssign={assignCrew} /> : null}
+        {view === "crew" ? <CrewView state={state} /> : null}
         {view === "combat" ? <CombatView state={state} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={startBestRepair} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onClearEffect={clearStatusEffect} /> : null}
         {view === "expeditions" ? <ExpeditionView state={state} now={now} onLaunch={launchExpedition} /> : null}
         {view === "directives" ? <DirectiveView state={state} onCompleteContract={completeContract} onAlly={formAlliance} onClaimObjective={claimObjective} onClaimMission={claimMission} /> : null}
@@ -885,12 +901,40 @@ function Bank({ state }: { state: GameState }) {
   return <div className="bank expanded panel"><div className="panel-heading"><div><p className="eyebrow">CARGO MANIFEST</p><h2>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} stored items</h2></div><PackageOpen /></div><div className="cargo-sections">{sections.map(([title, ids]) => <section key={title}><div className="collection-title"><h2>{title}</h2><span>{ids.reduce((total, id) => total + (state.inventory[id] ?? 0), 0)} units</span></div><div className="bank-grid">{ids.filter((id) => id in state.inventory).map((id) => <div key={id} className="bank-item"><Sprite kind="item" id={id} label={itemNames[id] ?? id} className="cargo-item-sprite" decorative /><div><small>{itemNames[id] ?? id}</small><strong>{fmt(state.inventory[id] ?? 0)}</strong></div></div>)}</div></section>)}</div></div>;
 }
 
-function SectorView({ state, onTravel }: { state: GameState; onTravel: (id: string) => void }) {
-  return <div className="sector-grid">{sectors.map((sector, index) => {
+function SectorView({ state, onTravel, onReplaceCrew }: { state: GameState; onTravel: (id: string) => void; onReplaceCrew: (incomingId: string, outgoingId: string) => void }) {
+  const [selectedReplacement, setSelectedReplacement] = useState(state.activeCrewIds[0] ?? "");
+  const replacementId = state.activeCrewIds.includes(selectedReplacement) ? selectedReplacement : state.activeCrewIds[0] ?? "";
+  const activeCrew = state.activeCrewIds.map((id) => crewById[id]).filter(Boolean);
+  const reserveCrew = state.recruitedCrewIds.filter((id) => !state.activeCrewIds.includes(id)).map((id) => crewById[id]).filter(Boolean);
+  const currentCandidates = recruitableCrew.filter((member) => member.sectorId === state.sectorId);
+  const currentSector = sectorById[state.sectorId];
+  const renderCrewCard = (member: typeof allCrew[number], mode: "candidate" | "reserve") => {
+    const active = state.activeCrewIds.includes(member.id);
+    const recruited = state.recruitedCrewIds.includes(member.id);
+    const canHire = !recruited && state.credits >= (member.hireCost ?? 0);
+    const action = active ? "On active crew" : recruited ? "Assign to crew" : `Hire · ${fmt(member.hireCost ?? 0)} credits`;
+    return <article key={member.id} className={`bar-crew-card ${active ? "active" : recruited ? "reserve" : "available"}`}>
+      <div className="bar-crew-head"><div className="crew-avatar">{member.name.split(" ").map((part) => part[0]).join("")}</div><div><p className="eyebrow">{member.role.toUpperCase()}</p><h3>{member.name}</h3></div><b>{active ? "ACTIVE" : recruited ? "RESERVE" : "AVAILABLE"}</b></div>
+      <p>{member.bio}</p><div className="bar-crew-meta"><span>{member.trait}</span><span>{skillMeta[member.primarySkill].name}</span></div>
+      <small>{member.perk}</small>
+      {mode === "candidate" && !recruited ? <em>{fmt(member.hireCost ?? 0)} credits · permanent hire</em> : null}
+      <Button disabled={active || !replacementId || (!recruited && !canHire)} onClick={() => onReplaceCrew(member.id, replacementId)}>{active ? action : !recruited && !canHire ? "Credits required" : action}</Button>
+    </article>;
+  };
+  return <>
+    <div className="sector-grid">{sectors.map((sector, index) => {
     const unlocked = totalLevel(state) >= sector.level;
     const fuel = Math.max(0, sector.fuel - (state.researchUnlocked.includes("phase-mapping") ? 1 : 0));
     return <article key={sector.id} className={`sector-card panel ${state.sectorId === sector.id ? "current" : ""}`}><span className="sector-index">{String(index + 1).padStart(2, "0")}</span><div><p className="eyebrow">{sector.tone}</p><h2>{sector.name}</h2><p>{sector.description}</p><small>Requires total level {sector.level} · {fuel} Fuel Rods</small></div><Button disabled={!unlocked || state.sectorId === sector.id || state.inventory.fuelRod < fuel} onClick={() => onTravel(sector.id)}>{state.sectorId === sector.id ? "Current sector" : unlocked ? "Travel" : "Locked"}</Button></article>;
-  })}</div>;
+    })}</div>
+    <section className="crew-bar panel">
+      <header className="crew-bar-heading"><div><p className="eyebrow">{currentSector?.name.toUpperCase()} · CREW BAR</p><h2>Hire specialists and shape your ship.</h2><p>Choose an active crew member to move to reserve, then hire a local specialist or return someone already aboard.</p></div><div className="crew-bar-credits"><Coins /><span>Available credits</span><strong>{fmt(state.credits)}</strong></div></header>
+      <div className="crew-bar-selector"><label><span>Replace active crew member</span><Select value={replacementId} onValueChange={setSelectedReplacement}><SelectTrigger aria-label="Active crew member to replace"><SelectValue /></SelectTrigger><SelectContent>{activeCrew.map((member) => <SelectItem key={member.id} value={member.id}>{member.name} · {skillMeta[member.primarySkill].name}</SelectItem>)}</SelectContent></Select></label><p>{replacementId ? <><strong>{crewById[replacementId]?.name}</strong> will move to reserve. All service XP and loyalty are retained.</> : "Select an active crew member to begin a change."}</p></div>
+      <div className="section-label"><p className="eyebrow">LOCAL APPLICANTS</p><h2>Five specialists at this bar</h2></div>
+      <div className="bar-crew-grid">{currentCandidates.map((member) => renderCrewCard(member, "candidate"))}</div>
+      {reserveCrew.length ? <><div className="section-label"><p className="eyebrow">YOUR RESERVE</p><h2>Return a previous crewmate</h2></div><div className="bar-crew-grid">{reserveCrew.map((member) => renderCrewCard(member, "reserve"))}</div></> : null}
+    </section>
+  </>;
 }
 
 function ShipView({ state, onUpgrade, onUpgradeEquipment, onEquip, onPowerMode, onBuildDrone, onBuildVehicle }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onUpgradeEquipment: (id: EquipmentId) => void; onEquip: (id: string) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
@@ -918,28 +962,27 @@ function crewLevel(xp: number) {
   return Math.min(50, 1 + Math.floor(Math.sqrt(xp / 25)));
 }
 
-function CrewView({ state, onAssign }: { state: GameState; onAssign: (id: string, skill: SkillId) => void }) {
-  const posted = crew.filter((member) => state.crewAssignments[member.id]).length;
-  const specialistPosts = crew.filter((member) => member.specialties.includes(state.crewAssignments[member.id])).length;
+function CrewView({ state }: { state: GameState }) {
+  const activeCrew = state.activeCrewIds.map((id) => crewById[id]).filter(Boolean);
+  const posted = activeCrew.length;
+  const specialistPosts = activeCrew.length;
   const pairBonus = SKILL_IDS.reduce((total, skillId) => total + Math.floor(crewCount(state, skillId) / 2), 0);
   return <>
-    <section className="crew-overview panel"><div><p className="eyebrow">CREW OPERATIONS</p><h2>Specialists make the cruiser stronger.</h2><p>Post crew to a skill to earn XP while that work completes. Every two people on the same posting add +1 output; a specialist also adds their personal bonus when placed in a native discipline.</p></div><div className="crew-overview-metrics"><span><strong>{posted}</strong> posted</span><span><strong>{specialistPosts}</strong> specialist posts</span><span><strong>+{pairBonus}</strong> pairing output</span></div></section>
-    <div className="crew-grid">{crew.map((member) => {
+    <section className="crew-overview panel"><div><p className="eyebrow">ACTIVE CREW</p><h2>Specialists hold their own posts.</h2><p>Each crew member automatically supports their primary skill and gains service XP whenever that work completes. Every two people sharing a primary post add +1 output.</p></div><div className="crew-overview-metrics"><span><strong>{posted}</strong> active</span><span><strong>{specialistPosts}</strong> fixed posts</span><span><strong>+{pairBonus}</strong> pairing output</span></div></section>
+    <div className="crew-grid">{activeCrew.map((member) => {
       const xp = state.crewXp[member.id] ?? 0;
       const level = crewLevel(xp);
       const loyalty = state.crewLoyalty[member.id] ?? 50;
-      const assignment = state.crewAssignments[member.id];
-      const specialist = member.specialties.includes(assignment);
-      const personalBonus = specialist ? 1 + Math.floor((level - 1) / 20) : 0;
+      const personalBonus = 1 + Math.floor((level - 1) / 20);
       const levelStart = (level - 1) ** 2 * 25;
       const nextLevelAt = level ** 2 * 25;
       const levelProgress = level >= 50 ? 100 : ((xp - levelStart) / Math.max(1, nextLevelAt - levelStart)) * 100;
-      return <article key={member.id} className={`crew-card panel ${specialist ? "specialist-post" : ""}`}>
+      return <article key={member.id} className="crew-card panel specialist-post">
         <div className="crew-card-head"><div className="crew-avatar">{member.name.split(" ").map((part) => part[0]).join("")}</div><div><p className="eyebrow">{member.role} · LEVEL {level}</p><h3>{member.name}</h3><p className="crew-bio">{member.bio}</p></div></div>
         <div className="crew-specialties"><span>{member.trait}</span>{member.specialties.map((skillId) => { const Icon = skillIcons[skillId]; return <span key={skillId}><Icon /> {skillMeta[skillId].name}</span>; })}</div>
-        <div className="crew-effect"><strong>{specialist ? `Active: +${personalBonus} ${skillMeta[assignment].name} output` : `General post: ${skillMeta[assignment].name}`}</strong><span>{specialist ? member.perk : "Move this specialist to a marked native discipline to activate their personal output bonus."}</span></div>
+        <div className="crew-effect"><strong>Primary post: +{personalBonus} {skillMeta[member.primarySkill].name} output</strong><span>{member.perk}</span></div>
         <div className="crew-progress"><div><span>Service XP · {fmt(xp)}</span><span>{level >= 50 ? "Veteran rank" : `${fmt(Math.max(0, nextLevelAt - xp))} XP to level ${level + 1}`}</span></div><Progress value={Math.max(0, Math.min(100, levelProgress))} /><div><span>Loyalty</span><span>{loyalty}%</span></div><Progress value={loyalty} /></div>
-        <label className="crew-posting"><span>Posting</span><Select value={assignment} onValueChange={(value) => onAssign(member.id, value as SkillId)}><SelectTrigger aria-label={`Assignment for ${member.name}`}><SelectValue /></SelectTrigger><SelectContent>{SKILL_IDS.map((id) => <SelectItem key={id} value={id}>{skillMeta[id].name}{member.specialties.includes(id) ? " · specialist" : ""}</SelectItem>)}</SelectContent></Select></label>
+        <div className="crew-posting"><span>Fixed posting</span><strong>{skillMeta[member.primarySkill].name}</strong><small>Change the active roster at a sector bar.</small></div>
       </article>;
     })}</div>
   </>;

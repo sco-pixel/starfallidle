@@ -520,6 +520,40 @@ h3 { font-size: 1rem; }
 .crew-progress [data-slot="progress"] { height: 4px; }
 .crew-posting { display: grid; gap: 5px; color: #9dabba; font: .62rem var(--font-mono); text-transform: uppercase; }
 .crew-posting [data-slot="select-trigger"] { width: 100%; border-radius: 0; background: #0a1119; }
+.crew-posting strong { color: #e1b255; font: 700 .78rem var(--font-mono); }
+.crew-posting small { color: #788998; font-size: .68rem; text-transform: none; }
+
+.crew-bar { margin-top: 12px; padding: 17px; display: grid; gap: 12px; border-color: #5a4729; background: linear-gradient(115deg, #121916, #0b131c 62%); }
+.crew-bar-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center; }
+.crew-bar-heading h2 { margin-top: 3px; }
+.crew-bar-heading p:not(.eyebrow) { max-width: 670px; margin-top: 5px; color: #97a6b3; font-size: .8rem; line-height: 1.45; }
+.crew-bar-credits { min-width: 135px; padding: 10px; display: grid; grid-template-columns: 19px 1fr; gap: 3px 8px; border: 1px solid #594827; background: #12150f; }
+.crew-bar-credits svg { grid-row: 1 / 3; width: 18px; color: #dfad4d; }
+.crew-bar-credits span { color: #94a29b; font: .62rem var(--font-mono); text-transform: uppercase; }
+.crew-bar-credits strong { color: #ebc168; font: 700 .86rem var(--font-mono); }
+.crew-bar-selector { padding: 12px; display: grid; grid-template-columns: minmax(220px, .8fr) 1.2fr; gap: 16px; align-items: end; border: 1px solid #354537; background: #0b1311; }
+.crew-bar-selector label { display: grid; gap: 6px; color: #a9b6ad; font: .66rem var(--font-mono); text-transform: uppercase; }
+.crew-bar-selector [data-slot="select-trigger"] { width: 100%; border-radius: 0; background: #08100f; }
+.crew-bar-selector p { margin: 0; color: #87978f; font-size: .75rem; line-height: 1.4; }
+.crew-bar-selector p strong { color: #e6bc62; }
+.bar-crew-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.bar-crew-card { min-height: 208px; padding: 12px; display: grid; gap: 8px; align-content: start; border: 1px solid #304051; border-left: 2px solid #496175; background: #091119; }
+.bar-crew-card.available { border-left-color: #d3a346; }
+.bar-crew-card.reserve { border-left-color: #5b9d82; }
+.bar-crew-card.active { border-left-color: #d6aa50; opacity: .72; }
+.bar-crew-head { display: grid; grid-template-columns: 38px 1fr auto; gap: 9px; align-items: center; }
+.bar-crew-head .crew-avatar { width: 38px; height: 38px; font-size: .64rem; }
+.bar-crew-head h3 { margin-top: 2px; font-size: .92rem; }
+.bar-crew-head > b { color: #95a4b1; font: .58rem var(--font-mono); }
+.bar-crew-card.available .bar-crew-head > b { color: #e7b85b; }
+.bar-crew-card.reserve .bar-crew-head > b { color: #73c09c; }
+.bar-crew-card > p { margin: 0; color: #8b9aa7; font-size: .73rem; line-height: 1.35; }
+.bar-crew-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+.bar-crew-meta span { padding: 3px 5px; border: 1px solid #37495b; color: #b8c6d1; font: .58rem var(--font-mono); }
+.bar-crew-meta span:last-child { color: #e7b758; border-color: #71582e; }
+.bar-crew-card small { color: #83939f; font-size: .67rem; line-height: 1.3; }
+.bar-crew-card em { color: #e1ae53; font: .62rem var(--font-mono); font-style: normal; }
+.bar-crew-card button { width: 100%; margin-top: auto; border-radius: 0; }
 
 .combat-summary {
   padding: 16px; margin-bottom: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-items: center;
@@ -747,8 +781,9 @@ h3 { font-size: 1rem; }
   .v3-heading .xp-block { grid-column: 1; }
   .sector-card { grid-template-columns: 36px 1fr; }
   .sector-card button { grid-column: 1 / -1; width: 100%; }
-  .module-grid, .crew-grid { grid-template-columns: 1fr; }
+  .module-grid, .crew-grid, .bar-crew-grid { grid-template-columns: 1fr; }
   .crew-overview { grid-template-columns: 1fr; }
+  .crew-bar-heading, .crew-bar-selector { grid-template-columns: 1fr; }
   .outpost-overview { grid-template-columns: 1fr; }
   .outpost-resources { justify-content: flex-start; }
   .outpost-card { grid-template-columns: 32px 1fr; padding: 13px; }
