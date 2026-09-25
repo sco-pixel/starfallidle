@@ -16,13 +16,13 @@ import {
 } from "@/components/ui/select";
 import {
   activities, allCrew, collectionEntries, contracts, droneSpecs, equipmentSpecs, recruitableCrew,
-  expeditions, itemNames, researchNodes, sectors, shipModules, skillMeta, vehicleSpecs,
+  expeditions, itemNames, researchNodes, restorationProjects, sectors, shipModules, skillMeta, vehicleSpecs,
   storyEvents, totalLevel, type Activity as SkillActivity,
 } from "@/lib/game-content";
 import { missionDefinitions, uniqueGear } from "@/lib/depth-content";
 import {
   MAX_SKILL_LEVEL, SKILL_IDS, defaultGameState, levelFromXp, sanitizeGameState, xpForLevel,
-  type CombatStance, type CombatWeapon, type DroneId, type EquipmentId, type GameState, type OutpostType, type PowerMode, type ShipModuleId, type SkillId, type StatusEffect, type VehicleId,
+  type CombatStance, type CombatWeapon, type DroneDuty, type DroneId, type EquipmentId, type GameState, type OutpostType, type PowerMode, type RestorationProjectId, type ShipModuleId, type SkillId, type StatusEffect, type VehicleId,
 } from "@/lib/game-state";
 import { Sprite } from "@/components/game/Sprite";
 import { CombatSprite } from "@/components/game/CombatSprite";
@@ -133,11 +133,35 @@ const objectives: Objective[] = [
   { id: "silent-decoder", sector: "Silent Systems", name: "Silent Decoder", description: "Complete the Silent Archive expedition", reward: "2 Ancient Cores", met: (s) => s.collection.includes("expedition-archive"), item: "ancientCore", amount: 2 },
 ];
 
-const marketGoods = ["ferrite", "cobalt", "salvage", "algae", "rations", "circuits", "plating", "powerCell", "data", "medicine", "fuelRod"];
+const marketGoods: { id: string; group: string; sellOnly?: boolean }[] = [
+  { id: "ferrite", group: "Raw materials" }, { id: "cobalt", group: "Raw materials" }, { id: "salvage", group: "Raw materials" },
+  { id: "circuits", group: "Industrial" }, { id: "plating", group: "Industrial" }, { id: "powerCell", group: "Industrial" },
+  { id: "algae", group: "Biological" }, { id: "rations", group: "Biological" }, { id: "medicine", group: "Biological" }, { id: "catalyst", group: "Biological" },
+  { id: "data", group: "Research" }, { id: "navData", group: "Research" }, { id: "fuelRod", group: "Frontier supplies" }, { id: "missiles", group: "Frontier supplies" },
+  { id: "sunsteel", group: "Aurelia restoration", sellOnly: true }, { id: "lumenGel", group: "Aurelia restoration", sellOnly: true },
+];
 const marketBase: Record<string, number> = {
   ferrite: 4, cobalt: 9, salvage: 6, algae: 5, rations: 8, circuits: 18,
-  plating: 24, powerCell: 30, data: 14, medicine: 22, fuelRod: 45,
+  plating: 24, powerCell: 30, data: 14, medicine: 22, fuelRod: 45, catalyst: 28,
+  navData: 24, missiles: 36, sunsteel: 120, lumenGel: 95,
 };
+
+function factionRank(reputation: number) {
+  return reputation >= 100 ? "Partner" : reputation >= 60 ? "Trusted" : reputation >= 30 ? "Recognised" : "Unknown";
+}
+
+function marketPressure(state: GameState, item: string) {
+  const sector = state.sectorId;
+  let pressure = 1;
+  if (sector === "helix" && ["medicine", "catalyst", "algae"].includes(item)) pressure = 1.18;
+  if (sector === "cinder" && ["missiles", "plating", "fuelRod"].includes(item)) pressure = 1.2;
+  if (sector === "orpheus" && ["powerCell", "navData", "data"].includes(item)) pressure = 1.18;
+  if (sector === "silent" && ["circuits", "powerCell", "data"].includes(item)) pressure = 1.22;
+  if (sector === "aurelia" && ["rations", "medicine", "sunsteel", "lumenGel"].includes(item)) pressure = 1.25;
+  if (sector === "aurelia" && state.restoration.habitat >= 2 && ["rations", "algae", "medicine"].includes(item)) pressure -= 0.12;
+  if (sector === "aurelia" && state.restoration.concord >= 2 && ["fuelRod", "navData"].includes(item)) pressure -= 0.1;
+  return pressure;
+}
 
 function fmt(value: number) { return Math.floor(value).toLocaleString(); }
 function duration(seconds: number) {
@@ -195,7 +219,7 @@ function combatHitChance(state: GameState, activity: SkillActivity) {
   const weaponTracking = state.combat.weapon === "missile" ? 18 : state.combat.weapon === "laser" ? 7 : -3;
   const training = Math.floor(state.skills.combat.level / 2) + (state.skills.combat.level >= 5 ? 5 : 0);
   const systems = state.equipment.railgun * 2 + state.shipModules.cic + state.drones.combat;
-  const gear = state.equippedGear === "gearPhaseLance" ? 12 : state.equippedGear === "gearStarfallCrown" ? 6 : 0;
+  const gear = state.equippedGear === "gearPhaseLance" ? 12 : state.equippedGear === "gearCrownbreaker" && activity.sectors?.includes("aurelia") ? 15 : state.equippedGear === "gearStarfallCrown" ? 6 : 0;
   const disruption = state.statusEffects.includes("sensorDisruption") ? -8 : 0;
   const tacticalOfficer = activeCrewMember(state, "sol", "combat") ? 5 : 0;
   return Math.max(45, Math.min(99, 78 + weaponTracking + training + systems + gear + disruption + tacticalOfficer - activity.enemy.evasion));
@@ -243,6 +267,18 @@ function outputBonus(state: GameState, activity: SkillActivity) {
   if (["science", "archaeology"].includes(skillId) && state.researchUnlocked.includes("data-vaults")) bonus += 1;
   if ((skillId === "botany" || skillId === "biochemistry") && state.researchUnlocked.includes("xeno-adaptation")) bonus += 1;
   if (skillId === "logistics") bonus += state.drones.cargo;
+  const aurelia = state.restoration;
+  if (state.sectorId === "aurelia") {
+    if (["science", "astrogation"].includes(skillId)) bonus += aurelia.lightwell;
+    if (["botany", "biochemistry", "medicine"].includes(skillId)) bonus += aurelia.habitat;
+    if (["logistics", "diplomacy"].includes(skillId)) bonus += aurelia.concord;
+  }
+  if (aurelia.lightwell >= 3 && ["science", "astrogation"].includes(skillId)) bonus += 1;
+  if (aurelia.habitat >= 4 && skillId === "logistics") bonus += 1;
+  const totalDrones = Object.values(state.drones).reduce((total, count) => total + count, 0);
+  if (state.droneDuty === "construction" && ["engineering", "metallurgy", "mining", "salvage"].includes(skillId)) bonus += Math.floor(totalDrones / 4);
+  if (state.droneDuty === "survey" && ["science", "archaeology", "astrogation"].includes(skillId)) bonus += Math.floor(totalDrones / 4);
+  if (state.droneDuty === "freight" && ["logistics", "diplomacy"].includes(skillId)) bonus += Math.floor(totalDrones / 4);
   if (state.outposts[state.sectorId]?.type === "mining" && ["mining", "salvage"].includes(skillId)) bonus += state.outposts[state.sectorId].level;
   if (state.outposts[state.sectorId]?.type === "research" && ["science", "archaeology"].includes(skillId)) bonus += state.outposts[state.sectorId].level;
   if (state.equippedGear === "gearFoundryHeart" && ["engineering", "metallurgy", "drones"].includes(skillId)) bonus += 2;
@@ -257,11 +293,13 @@ function combatDamage(state: GameState, activity: SkillActivity) {
   const stance = state.combat.stance === "aggressive" ? 1.25 : state.combat.stance === "defensive" ? 0.68 : 1;
   const veteran = state.skills.combat.level >= 15 ? 0.9 : 1;
   const bossAnalysis = state.researchUnlocked.includes("boss-analysis") && activity.enemy?.class.includes("Boss") ? 0.85 : 1;
-  const unique = state.equippedGear === "gearLivingBulwark" ? 0.85 : state.equippedGear === "gearStarfallCrown" ? 0.925 : 1;
+  const unique = state.equippedGear === "gearLivingBulwark" ? 0.85 : state.equippedGear === "gearDawnAegis" && activity.sectors?.includes("aurelia") ? 0.9 : state.equippedGear === "gearStarfallCrown" ? 0.925 : 1;
   const breach = state.statusEffects.includes("hullBreach") ? 1.18 : 1;
   const droneController = activeCrewMember(state, "rook", "drones") ? Math.min(4, state.drones.combat) : 0;
   const chiefEngineer = activeCrewMember(state, "jonas", "engineering") ? 1 : 0;
-  return Math.max(1, Math.floor((activity.damage - mitigation - droneController - chiefEngineer) * protocol * stance * veteran * bossAnalysis * unique * breach));
+  const escort = state.droneDuty === "escort" ? Math.floor(Object.values(state.drones).reduce((total, count) => total + count, 0) / 3) : 0;
+  const aureliaDefense = activity.sectors?.includes("aurelia") && state.restoration.concord >= 4 ? 0.9 : 1;
+  return Math.max(1, Math.floor((activity.damage - mitigation - droneController - chiefEngineer - escort) * protocol * stance * veteran * bossAnalysis * unique * breach * aureliaDefense));
 }
 function activityCosts(state: GameState, activity: SkillActivity) {
   const costs = { ...(activity.consumes ?? {}) };
@@ -272,6 +310,7 @@ function activityAvailable(state: GameState, activity: SkillActivity) {
   return !activity.sectors || activity.sectors.includes(state.sectorId);
 }
 function operationPauseReasons(state: GameState, activity: SkillActivity) {
+  if (activity.id === "aurelia-ashen-crown" && state.restoration.lightwell < 4) return ["Complete the Lightwell Array to summon the Ashen Crown"];
   if (activity.skillId === "combat" && activity.enemy) {
     const reason = combatPauseReason(state, activity, combatHooks);
     return reason ? [reason] : [];
@@ -356,7 +395,7 @@ function completeActions(state: GameState, activity: SkillActivity, requested: n
   const repairStrength = activity.id === "hull-repair" ? 18 : activity.id === "armour-plating-repair" ? 44 : activity.id === "reactor-grid-repair" ? 85 : 0;
   if (repairStrength) hull = Math.min(state.maxHull, hull + (repairStrength + (state.researchUnlocked.includes("autonomous-repair") ? 8 : 0)) * count);
   if (repairStrength) shields = Math.min(40 + state.equipment.shield * 10, shields + Math.ceil(repairStrength / 3) * count);
-  if (activity.skillId === "medicine") morale = Math.min(100, morale + (2 + state.shipModules.medbay) * count);
+  if (activity.skillId === "medicine") morale = Math.min(100, morale + (2 + state.shipModules.medbay + (state.restoration.habitat >= 3 ? 1 : 0)) * count);
   if (activity.skillId === "diplomacy") factions.frontier = Math.min(100, factions.frontier + count);
   const totalActionsAfter = state.totalActions + count;
   const crossedEvent = Math.floor(totalActionsAfter / 40) > Math.floor(state.totalActions / 40);
@@ -639,8 +678,9 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
   const travel = (sectorId: string) => updateState((current) => {
     const destination = sectorById[sectorId];
-    if (!destination || totalLevel(current) < destination.level) return current;
-    const discount = current.researchUnlocked.includes("phase-mapping") ? 1 : 0;
+    const aureliaLocked = sectorId === "aurelia" && !current.missionsCompleted.includes("starfall-protocol");
+    if (!destination || totalLevel(current) < destination.level || aureliaLocked) return current;
+    const discount = (current.researchUnlocked.includes("phase-mapping") ? 1 : 0) + (sectorId === "aurelia" && current.restoration.lightwell >= 2 ? 1 : 0);
     const fuel = Math.max(0, destination.fuel - discount);
     if ((current.inventory.fuelRod ?? 0) < fuel) return current;
     return applyAchievements({
@@ -677,6 +717,24 @@ export function GameShell({ initialState }: { initialState: GameState }) {
     const cost = vehicleSpecs[id].cost;
     if (!canAfford(current, cost)) return current;
     return { ...current, inventory: spend(current.inventory, cost), vehicles: { ...current.vehicles, [id]: current.vehicles[id] + 1 }, lastActiveAt: Date.now() };
+  });
+
+  const setDroneDuty = (droneDuty: DroneDuty) => updateState((current) => ({ ...current, droneDuty, lastActiveAt: Date.now() }));
+
+  const advanceRestoration = (id: RestorationProjectId) => updateState((current) => {
+    if (current.sectorId !== "aurelia") return current;
+    const project = restorationProjects.find((entry) => entry.id === id);
+    const stage = current.restoration[id];
+    const next = project?.stages[stage];
+    if (!project || !next || !canAfford(current, next.cost)) return current;
+    return {
+      ...current,
+      inventory: spend(current.inventory, next.cost),
+      restoration: { ...current.restoration, [id]: stage + 1 },
+      collection: Array.from(new Set([...current.collection, `restoration-${id}-${stage + 1}`])),
+      storyLog: [`${project.name}: ${next.name} complete.`, ...current.storyLog].slice(0, 30),
+      lastActiveAt: Date.now(),
+    };
   });
 
   const replaceCrew = (incomingId: string, outgoingId: string) => updateState((current) => {
@@ -762,9 +820,10 @@ export function GameShell({ initialState }: { initialState: GameState }) {
   const marketPrice = (item: string, mode: "buy" | "sell" = "buy") => {
     const sectorFactor = 1 + sectors.findIndex((entry) => entry.id === state.sectorId) * 0.08;
     const marketWave = 0.9 + ((Math.floor(now / 300_000) + item.length) % 5) * 0.05;
-    const stationPrice = marketBase[item] * sectorFactor * marketWave;
+    const stationPrice = marketBase[item] * sectorFactor * marketWave * marketPressure(state, item);
     if (mode === "sell") {
-      const cargoBonus = 1 + state.shipModules.cargo * 0.02 + state.skills.logistics.level * 0.003;
+      const factionBonus = Math.floor(Math.max(...Object.values(state.factions), 0) / 30) * 0.02;
+      const cargoBonus = 1 + state.shipModules.cargo * 0.02 + state.skills.logistics.level * 0.003 + factionBonus;
       return Math.max(1, Math.floor(stationPrice * 0.7 * cargoBonus));
     }
     return Math.max(1, Math.ceil(stationPrice * 1.1));
@@ -861,9 +920,9 @@ export function GameShell({ initialState }: { initialState: GameState }) {
 
         {view === "skills" ? <SkillView state={state} skillId={selectedSkill} activeId={active.id} onStart={startActivity} /> : null}
         {view === "bank" ? <Bank state={state} /> : null}
-        {view === "sectors" ? <SectorView state={state} onTravel={travel} /> : null}
+        {view === "sectors" ? <SectorView state={state} onTravel={travel} onAdvanceRestoration={advanceRestoration} /> : null}
         {view === "bar" ? <CrewBarView state={state} onReplaceCrew={replaceCrew} /> : null}
-        {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onUpgradeEquipment={upgradeEquipment} onEquip={equipUniqueGear} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} /> : null}
+        {view === "ship" ? <ShipView state={state} onUpgrade={upgradeModule} onUpgradeEquipment={upgradeEquipment} onEquip={equipUniqueGear} onPowerMode={setPowerMode} onBuildDrone={buildDrone} onBuildVehicle={buildVehicle} onDroneDuty={setDroneDuty} /> : null}
         {view === "crew" ? <CrewView state={state} /> : null}
         {view === "combat" ? <CombatView state={state} onRetreat={(value) => updateState((current) => ({ ...current, retreatAt: value }))} onRepair={startBestRepair} onDoctrine={(weapon, stance) => updateState((current) => ({ ...current, combat: { ...current.combat, ...(weapon ? { weapon } : {}), ...(stance ? { stance } : {}) } }))} onEngage={startCombat} onStop={stopCombat} onClearEffect={clearStatusEffect} /> : null}
         {view === "expeditions" ? <ExpeditionView state={state} now={now} onLaunch={launchExpedition} /> : null}
@@ -919,21 +978,32 @@ function SkillView({ state, skillId, activeId, onStart }: { state: GameState; sk
 
 function Bank({ state }: { state: GameState }) {
   const sections = [
-    ["Raw materials", ["ferrite", "cobalt", "iridium", "titanium", "phaseCrystal", "darkMatter", "quantumDust", "neutronium"]],
+    ["Raw materials", ["ferrite", "cobalt", "iridium", "titanium", "phaseCrystal", "darkMatter", "quantumDust", "neutronium", "sunsteel"]],
     ["Components & fabrication", ["salvage", "circuits", "plating", "powerCell", "droneParts", "titaniumPlate", "quantumAlloy", "quantumCircuit", "neutroniumPlate", "quantumParts", "singularityCore"]],
-    ["Supplies & biological", ["algae", "rations", "medicine", "catalyst", "xenoFiber", "neuralGel", "genesisSeed", "genesisCompound"]],
-    ["Data & discoveries", ["data", "navData", "relic", "artefact", "voidData", "ancientCore", "commandToken"]],
-    ["Combat stores & unique gear", ["missiles", "fuelRod", "gearPhaseLance", "gearLivingBulwark", "gearChronoDrive", "gearFoundryHeart", "gearStarfallCrown"]],
+    ["Supplies & biological", ["algae", "rations", "medicine", "catalyst", "xenoFiber", "neuralGel", "genesisSeed", "genesisCompound", "lumenGel"]],
+    ["Data & discoveries", ["data", "navData", "relic", "artefact", "voidData", "ancientCore", "commandToken", "civicCore", "concordSeal"]],
+    ["Combat stores & unique gear", ["missiles", "fuelRod", "gearPhaseLance", "gearLivingBulwark", "gearChronoDrive", "gearFoundryHeart", "gearStarfallCrown", "gearDawnAegis", "gearCrownbreaker"]],
   ] as const;
   return <div className="bank expanded panel"><div className="panel-heading"><div><p className="eyebrow">CARGO MANIFEST</p><h2>{Object.values(state.inventory).reduce((a, b) => a + b, 0)} stored items</h2></div><PackageOpen /></div><div className="cargo-sections">{sections.map(([title, ids]) => <section key={title}><div className="collection-title"><h2>{title}</h2><span>{ids.reduce((total, id) => total + (state.inventory[id] ?? 0), 0)} units</span></div><div className="bank-grid">{ids.filter((id) => id in state.inventory).map((id) => <div key={id} className="bank-item"><Sprite kind="item" id={id} label={itemNames[id] ?? id} className="cargo-item-sprite" decorative /><div><small>{itemNames[id] ?? id}</small><strong>{fmt(state.inventory[id] ?? 0)}</strong></div></div>)}</div></section>)}</div></div>;
 }
 
-function SectorView({ state, onTravel }: { state: GameState; onTravel: (id: string) => void }) {
-  return <div className="sector-grid">{sectors.map((sector, index) => {
-    const unlocked = totalLevel(state) >= sector.level;
-    const fuel = Math.max(0, sector.fuel - (state.researchUnlocked.includes("phase-mapping") ? 1 : 0));
-    return <article key={sector.id} className={`sector-card panel ${state.sectorId === sector.id ? "current" : ""}`}><span className="sector-index">{String(index + 1).padStart(2, "0")}</span><div><p className="eyebrow">{sector.tone}</p><h2>{sector.name}</h2><p>{sector.description}</p><small>Requires total level {sector.level} · {fuel} Fuel Rods</small></div><Button disabled={!unlocked || state.sectorId === sector.id || state.inventory.fuelRod < fuel} onClick={() => onTravel(sector.id)}>{state.sectorId === sector.id ? "Current sector" : unlocked ? "Travel" : "Locked"}</Button></article>;
-  })}</div>;
+function SectorView({ state, onTravel, onAdvanceRestoration }: { state: GameState; onTravel: (id: string) => void; onAdvanceRestoration: (id: RestorationProjectId) => void }) {
+  return <><div className="sector-grid">{sectors.map((sector, index) => {
+    const aureliaLocked = sector.id === "aurelia" && !state.missionsCompleted.includes("starfall-protocol");
+    const unlocked = totalLevel(state) >= sector.level && !aureliaLocked;
+    const fuel = Math.max(0, sector.fuel - (state.researchUnlocked.includes("phase-mapping") ? 1 : 0) - (sector.id === "aurelia" && state.restoration.lightwell >= 2 ? 1 : 0));
+    const requirement = aureliaLocked ? "Requires Starfall Protocol" : `Requires total level ${sector.level}`;
+    return <article key={sector.id} className={`sector-card panel ${state.sectorId === sector.id ? "current" : ""}`}><span className="sector-index">{String(index + 1).padStart(2, "0")}</span><div><p className="eyebrow">{sector.tone}</p><h2>{sector.name}</h2><p>{sector.description}</p><small>{requirement} · {fuel} Fuel Rods</small></div><Button disabled={!unlocked || state.sectorId === sector.id || state.inventory.fuelRod < fuel} onClick={() => onTravel(sector.id)}>{state.sectorId === sector.id ? "Current sector" : unlocked ? "Travel" : "Locked"}</Button></article>;
+  })}</div>{state.sectorId === "aurelia" ? <RestorationGrid state={state} onAdvance={onAdvanceRestoration} /> : null}</>;
+}
+
+function RestorationGrid({ state, onAdvance }: { state: GameState; onAdvance: (id: RestorationProjectId) => void }) {
+  return <section className="restoration-grid"><div className="section-label"><p className="eyebrow">AURELIA VERGE</p><h2>Restoration Grid</h2></div><p className="restoration-intro">Projects never decay. Complete every stage to make the Verge safer and permanently strengthen the Aethelgard.</p><div className="module-grid">{restorationProjects.map((project) => {
+    const stage = state.restoration[project.id];
+    const next = project.stages[stage];
+    const missing = next ? moduleMissing(state, next.cost) : [];
+    return <article key={project.id} className="module-card panel"><span><Sparkles /></span><div><p className="eyebrow">{stage}/4 STAGES COMPLETE</p><h3>{project.name}</h3><p>{project.description}</p>{next ? <><strong>Next: {next.name}</strong><small>Cost: {itemsText(next.cost)} · Reward: {next.reward}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Resources verified</em>}</> : <em className="ready-cost">Project complete</em>}</div><Button disabled={!next || missing.length > 0} onClick={() => onAdvance(project.id)}>{!next ? "Complete" : missing.length ? "Requirements unmet" : "Fund stage"}</Button></article>;
+  })}</div></section>;
 }
 
 function CrewBarView({ state, onReplaceCrew }: { state: GameState; onReplaceCrew: (incomingId: string, outgoingId: string) => void }) {
@@ -965,14 +1035,20 @@ function CrewBarView({ state, onReplaceCrew }: { state: GameState; onReplaceCrew
     </section>;
 }
 
-function ShipView({ state, onUpgrade, onUpgradeEquipment, onEquip, onPowerMode, onBuildDrone, onBuildVehicle }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onUpgradeEquipment: (id: EquipmentId) => void; onEquip: (id: string) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
+function ShipView({ state, onUpgrade, onUpgradeEquipment, onEquip, onPowerMode, onBuildDrone, onBuildVehicle, onDroneDuty }: { state: GameState; onUpgrade: (id: ShipModuleId) => void; onUpgradeEquipment: (id: EquipmentId) => void; onEquip: (id: string) => void; onPowerMode: (mode: PowerMode) => void; onBuildDrone: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void; onDroneDuty: (duty: DroneDuty) => void }) {
   const modes: { id: PowerMode; name: string; effect: string }[] = [
     { id: "balanced", name: "Balanced", effect: "No system penalties or priority bonuses" }, { id: "industrial", name: "Industrial", effect: "12% faster Engineering, Metallurgy and Drones" },
     { id: "research", name: "Research", effect: "12% faster scientific and medical skills" }, { id: "combat", name: "Combat", effect: "12% faster vessel encounters" },
     { id: "navigation", name: "Navigation", effect: "12% faster Astrogation, Logistics and Diplomacy" },
   ];
   const activeMode = modes.find((mode) => mode.id === state.powerMode) ?? modes[0];
-  return <><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>Deck modules</h2></div><div className="module-grid">{(Object.entries(shipModules) as [ShipModuleId, typeof shipModules[ShipModuleId]][]).map(([id, module]) => { const level = state.shipModules[id]; const cost = { plating: level * 3, circuits: level * 2, credits: level * 40 }; const missing = moduleMissing(state, cost); const affordable = missing.length === 0; return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>Current bonus: {module.effect(level)}</small><small>Next upgrade: {cost.credits} credits · {cost.plating} Plating · {cost.circuits} Circuits</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={!affordable} onClick={() => onUpgrade(id)}>{affordable ? "Upgrade" : "Requirements unmet"}</Button></article>; })}</div><ArmouryView state={state} onUpgrade={onUpgradeEquipment} onEquip={onEquip} /><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} /></>;
+  const moduleGroups: { title: string; ids: ShipModuleId[] }[] = [
+    { title: "Command & defense", ids: ["bridge", "cic", "reactor"] },
+    { title: "Industry & research", ids: ["cargo", "fabricator", "lab"] },
+    { title: "Crew & hangar", ids: ["hydroponics", "medbay", "hangar"] },
+  ];
+  const condition = state.statusEffects.length ? state.statusEffects.map((effect) => effect.replace(/([A-Z])/g, " $1")).join(" · ") : "All systems nominal";
+  return <><section className="ship-status panel"><div><p className="eyebrow">AETHELGARD STATUS</p><h2>Ready for the next frontier.</h2><p>{condition}</p></div><div className="ship-status-metrics"><span><strong>{state.hull}/{state.maxHull}</strong> hull</span><span><strong>{state.shields}</strong> shields</span><span><strong>{state.retreatAt}%</strong> retreat point</span></div></section><section className="power-panel panel"><header className="power-intro"><div><p className="eyebrow">REACTOR DISTRIBUTION</p><h2>Ship power priority</h2><p>Select one preset to change operation speeds immediately.</p></div><div className="power-readout"><Zap /><span>Current routing</span><strong>{activeMode.name}</strong><small>{activeMode.effect}</small></div></header><div className="power-options">{modes.map((mode) => { const selected = state.powerMode === mode.id; return <button type="button" key={mode.id} className={selected ? "selected" : ""} aria-pressed={selected} onClick={() => onPowerMode(mode.id)}><span className="power-option-icon"><Zap /></span><span><strong>{mode.name}</strong><small>{mode.effect}</small></span><b>{selected ? "ACTIVE" : "SELECT"}</b></button>; })}</div></section>{moduleGroups.map((group) => <section key={group.title}><div className="section-label"><p className="eyebrow">VESSEL SYSTEMS</p><h2>{group.title}</h2></div><div className="module-grid">{group.ids.map((id) => { const module = shipModules[id]; const level = state.shipModules[id]; const cost = { plating: level * 3, circuits: level * 2, credits: level * 40 }; const missing = moduleMissing(state, cost); return <article key={id} className="module-card panel"><span><Orbit /></span><div><p className="eyebrow">DECK SYSTEM · MK {level}</p><h3>{module.name}</h3><p>{module.description}</p><small>Current bonus: {module.effect(level)}</small><small>Next: {cost.credits} credits · {cost.plating} Plating · {cost.circuits} Circuits</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onUpgrade(id)}>{missing.length ? "Requirements unmet" : "Upgrade"}</Button></article>; })}</div></section>)}<ArmouryView state={state} onUpgrade={onUpgradeEquipment} onEquip={onEquip} /><DroneView state={state} onBuild={onBuildDrone} onBuildVehicle={onBuildVehicle} onDroneDuty={onDroneDuty} /></>;
 }
 
 function moduleMissing(state: GameState, cost: Record<string, number>) {
@@ -1016,8 +1092,9 @@ function CrewView({ state }: { state: GameState }) {
   </>;
 }
 
-function DroneView({ state, onBuild, onBuildVehicle }: { state: GameState; onBuild: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void }) {
-  return <><div className="section-label"><p className="eyebrow">AUTONOMOUS CRAFT</p><h2>Drone Swarms</h2></div><div className="module-grid">{(Object.entries(droneSpecs) as [DroneId, typeof droneSpecs[DroneId]][]).map(([id, drone]) => { const missing = moduleMissing(state, drone.cost); return <article key={id} className="module-card panel"><span><Bot /></span><div><p className="eyebrow">ACTIVE UNITS · {state.drones[id]}</p><h3>{drone.name}</h3><p>{drone.description}</p><small>Current bonus: {drone.effect(state.drones[id])}</small><small>Fabrication cost: {itemsText(drone.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuild(id)}>{missing.length ? "Requirements unmet" : "Fabricate"}</Button></article>; })}</div><div className="section-label"><p className="eyebrow">HANGAR VEHICLES</p><h2>Surface & Boarding Craft</h2></div><div className="module-grid">{(Object.entries(vehicleSpecs) as [VehicleId, typeof vehicleSpecs[VehicleId]][]).map(([id, vehicle]) => { const missing = moduleMissing(state, vehicle.cost); return <article key={id} className="module-card panel"><span><Rocket /></span><div><p className="eyebrow">READY · {state.vehicles[id]}</p><h3>{vehicle.name}</h3><p>{vehicle.description}</p><small>Current bonus: {vehicle.effect(state.vehicles[id])}</small><small>Construction cost: {itemsText(vehicle.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuildVehicle(id)}>{missing.length ? "Requirements unmet" : "Construct"}</Button></article>; })}</div></>;
+function DroneView({ state, onBuild, onBuildVehicle, onDroneDuty }: { state: GameState; onBuild: (id: DroneId) => void; onBuildVehicle: (id: VehicleId) => void; onDroneDuty: (duty: DroneDuty) => void }) {
+  const duties: { id: DroneDuty; name: string; effect: string }[] = [{ id: "balanced", name: "Balanced", effect: "Standard support" }, { id: "construction", name: "Construction", effect: "Industrial support" }, { id: "escort", name: "Escort", effect: "Combat protection" }, { id: "survey", name: "Survey", effect: "Research support" }, { id: "freight", name: "Freight", effect: "Command support" }];
+  return <><div className="section-label"><p className="eyebrow">AUTONOMOUS CRAFT</p><h2>Drone Swarms</h2></div><section className="drone-duty panel"><div><p className="eyebrow">SWARM ASSIGNMENT</p><h3>{duties.find((entry) => entry.id === state.droneDuty)?.name}</h3><p>Assign the full fleet to one focused support duty.</p></div><div>{duties.map((duty) => <Button key={duty.id} size="sm" variant={state.droneDuty === duty.id ? "default" : "outline"} onClick={() => onDroneDuty(duty.id)} title={duty.effect}>{duty.name}</Button>)}</div></section><div className="module-grid">{(Object.entries(droneSpecs) as [DroneId, typeof droneSpecs[DroneId]][]).map(([id, drone]) => { const missing = moduleMissing(state, drone.cost); return <article key={id} className="module-card panel"><span><Bot /></span><div><p className="eyebrow">ACTIVE UNITS · {state.drones[id]}</p><h3>{drone.name}</h3><p>{drone.description}</p><small>Current bonus: {drone.effect(state.drones[id])}</small><small>Fabrication cost: {itemsText(drone.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuild(id)}>{missing.length ? "Requirements unmet" : "Fabricate"}</Button></article>; })}</div><div className="section-label"><p className="eyebrow">HANGAR VEHICLES</p><h2>Surface & Boarding Craft</h2></div><div className="module-grid">{(Object.entries(vehicleSpecs) as [VehicleId, typeof vehicleSpecs[VehicleId]][]).map(([id, vehicle]) => { const missing = moduleMissing(state, vehicle.cost); return <article key={id} className="module-card panel"><span><Rocket /></span><div><p className="eyebrow">READY · {state.vehicles[id]}</p><h3>{vehicle.name}</h3><p>{vehicle.description}</p><small>Current bonus: {vehicle.effect(state.vehicles[id])}</small><small>Construction cost: {itemsText(vehicle.cost)}</small>{missing.length ? <em className="missing-cost">Missing: {missing.join(" · ")}</em> : <em className="ready-cost">Materials verified</em>}</div><Button disabled={missing.length > 0} onClick={() => onBuildVehicle(id)}>{missing.length ? "Requirements unmet" : "Construct"}</Button></article>; })}</div></>;
 }
 
 function victoriesUntilRareSalvage(victories: number, mastery: number, rareEvery: number) {
@@ -1178,7 +1255,7 @@ function DirectiveView({ state, onCompleteContract, onAlly, onClaimObjective, on
   const openMissions = missionDefinitions.filter((entry) => !state.missionsCompleted.includes(entry.id)).sort((a, b) => Number(missionReady(state, b.id)) - Number(missionReady(state, a.id)));
   return <div className="directive-board">
     <section className="directive-overview panel"><div><p className="eyebrow">FRONTIER MISSION CONTROL</p><h2>One board for every active goal.</h2><p>Contracts fund the cruiser and earn faction standing. Objectives mark career milestones. Missions are the long-form story across the five sectors.</p></div><div className="directive-counts"><span><strong>{openContracts.length}</strong> contracts</span><span><strong>{openObjectives.length}</strong> objectives</span><span><strong>{openMissions.length}</strong> missions</span></div></section>
-    <section className="directive-section"><div className="section-label"><p className="eyebrow">FACTION WORK</p><h2>Contracts</h2></div><div className="faction-strip">{Object.entries(state.factions).map(([id, rep]) => <div key={id} className={`panel ${state.factionAlly === id ? "allied" : ""}`}><small>{factionNames[id]}</small><strong>{rep}</strong><Progress value={rep} /><Button variant="outline" disabled={Boolean(state.factionAlly) || rep < 30} onClick={() => onAlly(id)}>{state.factionAlly === id ? "Allied" : rep < 30 ? "30 rep required" : "Form alliance"}</Button></div>)}</div>{state.factionAlly ? <div className="notice panel">Alliance active with {factionNames[state.factionAlly]}. Their contracts award 20% more credits.</div> : null}<div className="module-grid">{openContracts.map((contract) => { const affordable = canAfford(state, contract.cost); const missing = Object.entries(contract.cost).filter(([id, amount]) => (state.inventory[id] ?? 0) < amount).map(([id, amount]) => `${amount - (state.inventory[id] ?? 0)} ${itemNames[id] ?? id}`); const reputation = Math.floor(contract.reward.reputation * (state.researchUnlocked.includes("broker-network") ? 1.25 : 1)); return <article key={contract.id} className="module-card panel"><span><ScrollText /></span><div><p className="eyebrow">{factionNames[contract.faction]}</p><h3>{contract.name}</h3><p>{contract.description}</p><small>Deliver: {itemsText(contract.cost)} · Reward: {Math.floor(contract.reward.credits * (state.factionAlly === contract.faction ? 1.2 : 1))} credits · +{reputation} reputation</small><em className={affordable ? "ready-cost" : "missing-cost"}>{affordable ? "Cargo verified — ready to fulfil" : `Need ${missing.join(" · ")}`}</em></div><Button disabled={!affordable} onClick={() => onCompleteContract(contract.id)}>{affordable ? "Fulfil contract" : "Cargo required"}</Button></article>; })}</div><CompletedArchive title="Fulfilled contracts" count={state.contractsCompleted.length}>{contracts.filter((entry) => state.contractsCompleted.includes(entry.id)).map((entry) => <span key={entry.id}>{entry.name} · {factionNames[entry.faction]}</span>)}</CompletedArchive></section>
+    <section className="directive-section"><div className="section-label"><p className="eyebrow">FACTION WORK</p><h2>Contracts</h2></div><div className="faction-strip">{Object.entries(state.factions).map(([id, rep]) => <div key={id} className={`panel ${state.factionAlly === id ? "allied" : ""}`}><small>{factionNames[id]} · {factionRank(rep)}</small><strong>{rep}</strong><Progress value={rep} /><em>{rep < 30 ? "30: alliance access" : rep < 60 ? "60: trusted market access" : rep < 100 ? "100: partner standing" : "Partner standing secured"}</em><Button variant="outline" disabled={Boolean(state.factionAlly) || rep < 30} onClick={() => onAlly(id)}>{state.factionAlly === id ? "Allied" : rep < 30 ? "30 rep required" : "Form alliance"}</Button></div>)}</div>{state.factionAlly ? <div className="notice panel">Alliance active with {factionNames[state.factionAlly]}. Their contracts award 20% more credits.</div> : null}<div className="module-grid">{openContracts.map((contract) => { const affordable = canAfford(state, contract.cost); const missing = Object.entries(contract.cost).filter(([id, amount]) => (state.inventory[id] ?? 0) < amount).map(([id, amount]) => `${amount - (state.inventory[id] ?? 0)} ${itemNames[id] ?? id}`); const reputation = Math.floor(contract.reward.reputation * (state.researchUnlocked.includes("broker-network") ? 1.25 : 1)); return <article key={contract.id} className="module-card panel"><span><ScrollText /></span><div><p className="eyebrow">{factionNames[contract.faction]}</p><h3>{contract.name}</h3><p>{contract.description}</p><small>Deliver: {itemsText(contract.cost)} · Reward: {Math.floor(contract.reward.credits * (state.factionAlly === contract.faction ? 1.2 : 1))} credits · +{reputation} reputation</small><em className={affordable ? "ready-cost" : "missing-cost"}>{affordable ? "Cargo verified — ready to fulfil" : `Need ${missing.join(" · ")}`}</em></div><Button disabled={!affordable} onClick={() => onCompleteContract(contract.id)}>{affordable ? "Fulfil contract" : "Cargo required"}</Button></article>; })}</div><CompletedArchive title="Fulfilled contracts" count={state.contractsCompleted.length}>{contracts.filter((entry) => state.contractsCompleted.includes(entry.id)).map((entry) => <span key={entry.id}>{entry.name} · {factionNames[entry.faction]}</span>)}</CompletedArchive></section>
     <section className="directive-section"><div className="section-label"><p className="eyebrow">CAREER MILESTONES</p><h2>Objectives</h2></div><div className="research-tree">{openObjectives.map((objective, index) => { const met = objective.met(state); return <article key={objective.id} className="research-node panel"><span>{index + 1}</span><div><p className="eyebrow">{objective.sector.toUpperCase()}</p><h3>{objective.name}</h3><p>{objective.description}</p><small>Reward: {objective.reward}</small></div><Button disabled={!met} onClick={() => onClaimObjective(objective.id)}>{met ? "Claim reward" : "In progress"}</Button></article>; })}</div><CompletedArchive title="Completed objectives" count={state.claimedObjectives.length}>{objectives.filter((entry) => state.claimedObjectives.includes(entry.id)).map((entry) => <span key={entry.id}>{entry.name} · {entry.sector}</span>)}</CompletedArchive></section>
     <section className="directive-section"><div className="section-label"><p className="eyebrow">NARRATIVE CAMPAIGN</p><h2>Missions</h2></div><div className="research-tree">{openMissions.map((mission, index) => { const ready = missionReady(state, mission.id); const reward = mission.reward as Record<string, number>; const { credits = 0, ...items } = reward; const adjustedCredits = Math.floor(credits * (state.researchUnlocked.includes("mission-beacon") ? 1.2 : 1)); return <article key={mission.id} className="research-node panel"><span>{index + 1}</span><div><p className="eyebrow">NARRATIVE MISSION</p><h3>{mission.name}</h3><p>{mission.description}</p><small>Reward: {itemsText(items)}{adjustedCredits ? `${Object.keys(items).length ? " · " : ""}${fmt(adjustedCredits)} credits` : ""}</small></div><Button disabled={!ready} onClick={() => onClaimMission(mission.id)}>{ready ? "Claim reward" : "In progress"}</Button></article>; })}</div><CompletedArchive title="Completed missions" count={state.missionsCompleted.length}>{missionDefinitions.filter((entry) => state.missionsCompleted.includes(entry.id)).map((entry) => <span key={entry.id}>{entry.name}</span>)}</CompletedArchive></section>
   </div>;
@@ -1219,14 +1296,16 @@ function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: 
   const [orderSize, setOrderSize] = useState(1);
   const sector = sectorById[state.sectorId];
   const nextRefresh = 300 - Math.floor((now % 300_000) / 1_000);
-  const cargoBonus = Math.round((state.shipModules.cargo * 2 + state.skills.logistics.level * 0.3) * 10) / 10;
+  const cargoBonus = Math.round((state.shipModules.cargo * 2 + state.skills.logistics.level * 0.3 + Math.floor(Math.max(...Object.values(state.factions), 0) / 30) * 2) * 10) / 10;
+  const wanted = new Set([...contracts.filter((contract) => !state.contractsCompleted.includes(contract.id)).flatMap((contract) => Object.keys(contract.cost)), ...restorationProjects.flatMap((project) => project.stages.slice(state.restoration[project.id]).flatMap((stage) => Object.keys(stage.cost)))]);
+  const groups = Array.from(new Set(marketGoods.map((good) => good.group)));
   return <div className="market-view">
     <section className="market-overview panel">
-      <div><p className="eyebrow">DOCKED AT {sector.name.toUpperCase()}</p><h2>Station exchange</h2><p>Trade common supplies at the local station. Quotes refresh every five minutes; selling benefits from your cargo deck and Logistics training.</p></div>
+      <div><p className="eyebrow">DOCKED AT {sector.name.toUpperCase()}</p><h2>Station exchange</h2><p>Sector demand drives every quote. Contracts and Aurelia projects mark the cargo they need; rare restoration materials remain sell-only.</p></div>
       <div className="market-metrics"><span><Coins />{fmt(state.credits)}<small>credits</small></span><span><PackageOpen />{fmt(Object.values(state.inventory).reduce((total, amount) => total + amount, 0))}<small>cargo units</small></span><span><Activity />{Math.floor(nextRefresh / 60)}:{String(nextRefresh % 60).padStart(2, "0")}<small>next refresh</small></span></div>
     </section>
-    <section className="market-toolbar panel"><div><strong>Order size</strong><div className="market-size-buttons">{[50, 100, 150, 200, 250, 500, 1000].map((amount) => <Button key={amount} variant={orderSize === amount ? "default" : "outline"} onClick={() => setOrderSize(amount)}>{amount}</Button>)}</div></div><p><TrendingUp />Cargo and Logistics add <b>+{cargoBonus}%</b> to sell quotes.</p></section>
-    <section className="market-table panel"><div className="market-table-head"><span>Commodity</span><span>Market quote</span><span>Trade</span></div>{marketGoods.map((id) => {
+    <section className="market-toolbar panel"><div><strong>Order size</strong><div className="market-size-buttons">{[1, 5, 10, 25, 50, 100].map((amount) => <Button key={amount} variant={orderSize === amount ? "default" : "outline"} onClick={() => setOrderSize(amount)}>{amount}</Button>)}</div></div><p><TrendingUp />Cargo, Logistics, and faction rank add <b>+{cargoBonus}%</b> to sell quotes.</p></section>
+    {groups.map((group) => <section key={group} className="market-table panel"><div className="market-group-title"><p className="eyebrow">{group.toUpperCase()}</p><span>{marketGoods.filter((good) => good.group === group).length} commodities</span></div><div className="market-table-head"><span>Commodity</span><span>Market quote</span><span>Trade</span></div>{marketGoods.filter((good) => good.group === group).map((good) => { const id = good.id;
       const buyPrice = getPrice(id, "buy");
       const sellPrice = getPrice(id, "sell");
       const holding = state.inventory[id] ?? 0;
@@ -1234,8 +1313,8 @@ function MarketView({ state, now, getPrice, onTrade }: { state: GameState; now: 
       const rising = buyPrice >= base * 1.1;
       const buyAmount = Math.min(orderSize, Math.floor(state.credits / buyPrice));
       const sellAmount = Math.min(orderSize, holding);
-      return <div key={id} className="market-row"><Sprite kind="item" id={id} label={itemNames[id]} className="market-item-icon" decorative /><div className="market-item"><strong>{itemNames[id]}</strong><small>In cargo: {fmt(holding)}</small></div><div className="market-quote"><span className={rising ? "rising" : "falling"}>{rising ? <ArrowUpRight /> : <ArrowDownRight />}{rising ? "Active demand" : "Soft demand"}</span><b>Buy {buyPrice} cr</b><small>Sell {sellPrice} cr</small></div><div className="market-actions"><Button variant="outline" disabled={!sellAmount} onClick={() => onTrade(id, "sell", orderSize)}>Sell {sellAmount || orderSize}</Button><Button disabled={!buyAmount} onClick={() => onTrade(id, "buy", orderSize)}>Buy {buyAmount || orderSize}</Button></div></div>;
-    })}</section>
+      return <div key={id} className="market-row"><Sprite kind="item" id={id} label={itemNames[id]} className="market-item-icon" decorative /><div className="market-item"><strong>{itemNames[id]}</strong><small>{wanted.has(id) ? "Needed by an active contract or project" : `In cargo: ${fmt(holding)}`}</small></div><div className="market-quote"><span className={rising ? "rising" : "falling"}>{rising ? <ArrowUpRight /> : <ArrowDownRight />}{rising ? "Active demand" : "Soft demand"}</span><b>{good.sellOnly ? "Sell only" : `Buy ${buyPrice} cr`}</b><small>Sell {sellPrice} cr</small></div><div className="market-actions"><Button variant="outline" disabled={!sellAmount} onClick={() => onTrade(id, "sell", orderSize)}>Sell {sellAmount || orderSize}</Button>{good.sellOnly ? null : <Button disabled={!buyAmount} onClick={() => onTrade(id, "buy", orderSize)}>Buy {buyAmount || orderSize}</Button>}</div></div>;
+    })}</section>)}
   </div>;
 }
 

@@ -1,5 +1,5 @@
 import type { DroneId, EquipmentId, GameState, ShipModuleId, SkillId, VehicleId } from "./game-state";
-import { advancedActivities, bossActivities, combatActivities } from "./depth-content";
+import { advancedActivities, aureliaActivities, aureliaCombatActivities, bossActivities, combatActivities } from "./depth-content";
 
 export type Activity = {
   id: string;
@@ -48,8 +48,9 @@ export const itemNames: Record<string, string> = {
   neutroniumPlate: "Neutronium Plating", singularityCore: "Singularity Cores", genesisSeed: "Genesis Seed", genesisCompound: "Genesis Compound",
   voidData: "Void Data", commandToken: "Command Token", phaseFilament: "Phase Filament", bioLumen: "Bio-lumen",
   voidLens: "Void Lens", sentinelCipher: "Sentinel Cipher", riftAlloy: "Rift Alloy", phaseLattice: "Phase Lattice", repairNanites: "Repair Nanites",
+  sunsteel: "Sunsteel", civicCore: "Civic Core", lumenGel: "Lumen Gel", concordSeal: "Concord Seal",
   gearPhaseLance: "Phase Lance", gearLivingBulwark: "Living Bulwark",
-  gearChronoDrive: "Chrono Drive", gearFoundryHeart: "Foundry Heart", gearStarfallCrown: "Starfall Crown",
+  gearChronoDrive: "Chrono Drive", gearFoundryHeart: "Foundry Heart", gearStarfallCrown: "Starfall Crown", gearDawnAegis: "Dawn Aegis", gearCrownbreaker: "Crownbreaker Array",
 };
 
 const coreActivities: Activity[] = [
@@ -155,7 +156,7 @@ const coreActivities: Activity[] = [
   { id: "sentinel-city", skillId: "archaeology", name: "Sentinel City Survey", level: 20, seconds: 16, xp: 72, description: "Map the cultural layers beneath an active machine metropolis.", consumes: { relic: 4, powerCell: 2 }, produces: { artefact: 2, data: 6 }, sectors: ["silent"] },
 ];
 
-export const activities: Activity[] = [...coreActivities, ...combatActivities, ...advancedActivities, ...bossActivities];
+export const activities: Activity[] = [...coreActivities, ...combatActivities, ...advancedActivities, ...aureliaActivities, ...aureliaCombatActivities, ...bossActivities];
 
 export const sectors = [
   { id: "erebus", name: "Erebus Belt", level: 1, fuel: 0, tone: "Industrial frontier", description: "Safe shipping lanes, training rocks and crowded salvage fields." },
@@ -163,6 +164,28 @@ export const sectors = [
   { id: "cinder", name: "Cinder Expanse", level: 24, fuel: 2, tone: "Corsair territory", description: "Profitable wrecks guarded by organised raider fleets." },
   { id: "orpheus", name: "Orpheus Rift", level: 42, fuel: 3, tone: "Gravitational fracture", description: "Rare minerals, time distortion and unstable routes." },
   { id: "silent", name: "The Silent Systems", level: 70, fuel: 5, tone: "Machine domain", description: "Endgame ruins protected by ancient autonomous sentinels." },
+  { id: "aurelia", name: "Aurelia Verge", level: 900, fuel: 7, tone: "Stellar restoration", description: "A recovered sun-system where crews, machines and colonies attempt a second beginning." },
+];
+
+export const restorationProjects: { id: "lightwell" | "habitat" | "concord"; name: string; description: string; stages: { name: string; cost: Record<string, number>; reward: string }[] }[] = [
+  { id: "lightwell", name: "Lightwell Array", description: "Rebuild orbital mirrors that make Aurelia's unstable lanes navigable.", stages: [
+    { name: "Survey the corona", cost: { data: 35, navData: 18, phaseCrystal: 6 }, reward: "+1 Science and Astrogation output in Aurelia" },
+    { name: "Set the mirrors", cost: { sunsteel: 24, phaseLattice: 6, powerCell: 12 }, reward: "Aurelia travel costs 1 fewer Fuel Rod" },
+    { name: "Synchronise the lattice", cost: { civicCore: 8, voidData: 20, quantumCircuit: 8 }, reward: "+1 Science and Astrogation output everywhere" },
+    { name: "Light the verge", cost: { concordSeal: 3, singularityCore: 1, lumenGel: 18 }, reward: "Unlock the Ashen Crown engagement" },
+  ] },
+  { id: "habitat", name: "Habitat Lattice", description: "Turn dark stations into a durable civilian refuge.", stages: [
+    { name: "Clear the rings", cost: { salvage: 45, medicine: 16, repairNanites: 4 }, reward: "+1 Medicine output in Aurelia" },
+    { name: "Raise the gardens", cost: { sunsteel: 18, lumenGel: 18, genesisSeed: 5 }, reward: "+1 Xenobotany and Biochemistry output in Aurelia" },
+    { name: "Open the clinics", cost: { civicCore: 6, medicine: 28, neuralGel: 10 }, reward: "Medicine actions restore 1 additional morale" },
+    { name: "Welcome the sleepers", cost: { concordSeal: 2, genesisCompound: 8, repairNanites: 10 }, reward: "+1 Logistics output everywhere" },
+  ] },
+  { id: "concord", name: "Concord Charter", description: "Establish a settlement compact between survivors and machine descendants.", stages: [
+    { name: "Convene the council", cost: { rations: 24, data: 28, relic: 8 }, reward: "+1 Diplomacy output in Aurelia" },
+    { name: "Secure relief lanes", cost: { fuelRod: 8, medicine: 14, navData: 20 }, reward: "+1 Logistics output in Aurelia" },
+    { name: "Ratify the charter", cost: { civicCore: 8, artefact: 5, commandToken: 1 }, reward: "Faction ranks unlock at 60 reputation" },
+    { name: "Hold the line", cost: { sunsteel: 30, concordSeal: 3, missiles: 20 }, reward: "Combat engagements in Aurelia deal 10% less damage" },
+  ] },
 ];
 
 export const shipModules: Record<ShipModuleId, { name: string; description: string; effect: (level: number) => string }> = {
@@ -240,6 +263,13 @@ export const recruitableCrew: CrewMember[] = [
     { id: "quill", name: "Quill Sorn", role: "Envoy", trait: "Measured Voice", primarySkill: "diplomacy", specialties: ["diplomacy"], bio: "A negotiator who approaches machine intelligences with patience rather than assumptions.", perk: "Signal accord: a level-based Diplomacy output bonus." },
     { id: "kira", name: "Kira Fen", role: "Tactical Specialist", trait: "Cold Focus", primarySkill: "combat", specialties: ["combat"], bio: "A Sentinel-zone scout whose calm makes hostile targeting data feel almost routine.", perk: "Quiet lock: a level-based Combat output bonus." },
     { id: "unit-9", name: "Unit-9", role: "Drone Pilot", trait: "Distributed Mind", primarySkill: "drones", specialties: ["drones"], bio: "A recovered service intelligence that choreographs drones with precise, wordless signals.", perk: "Machine chorus: a level-based Drone Command output bonus." },
+  ]),
+  ...sectorCrew("aurelia", 6200, [
+    { id: "lyra", name: "Lyra Sol", role: "Restoration Medic", trait: "Daybreak", primarySkill: "medicine", specialties: ["medicine", "biochemistry"], bio: "Lyra has kept too many evacuation wards alive to confuse optimism with care.", perk: "Solar triage: a level-based Medicine output bonus." },
+    { id: "cass", name: "Cass Iven", role: "Route Marshal", trait: "Clear Channel", primarySkill: "logistics", specialties: ["logistics", "astrogation"], bio: "Cass can turn a disputed supply lane into a timetable everyone trusts.", perk: "Restoration freight: a level-based Logistics output bonus." },
+    { id: "ren", name: "Ren Arcos", role: "Charter Envoy", trait: "Common Ground", primarySkill: "diplomacy", specialties: ["diplomacy", "archaeology"], bio: "Ren treats every treaty as an engineering problem with people in it.", perk: "Open table: a level-based Diplomacy output bonus." },
+    { id: "tavi", name: "Tavi Orm", role: "Heliostat Engineer", trait: "Brightwork", primarySkill: "engineering", specialties: ["engineering", "drones"], bio: "Tavi repairs orbital mirrors with a patience that makes damaged machines seem embarrassed.", perk: "Mirror craft: a level-based Engineering output bonus." },
+    { id: "orin", name: "Orin Vale", role: "Crown Scout", trait: "Last Light", primarySkill: "combat", specialties: ["combat", "science"], bio: "Orin charts hostile patterns in the glare where ordinary sensors give up.", perk: "Corona lock: a level-based Combat output bonus." },
   ]),
 ];
 

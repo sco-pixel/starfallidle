@@ -2,15 +2,16 @@
 
 ## Galaxy size
 
-Starfall Idle has exactly five sectors:
+Starfall Idle has six sectors:
 
 1. Erebus Belt
 2. Helix Reach
 3. Cinder Expanse
 4. Orpheus Rift
 5. The Silent Systems
+6. Aurelia Verge
 
-Do not add more sectors, locations, sublocations, destinations, planets, stations, or map nodes. New progression, operations, enemies, bosses, missions, resources, outposts, and story content must use these five existing sectors.
+Do not add more sectors, locations, sublocations, destinations, planets, stations, or map nodes without a deliberate revision of this document. Aurelia Verge is the sole approved expansion sector. Its Restoration Grid is a sector-wide project board, not a collection of map nodes.
 
 ## Core direction
 

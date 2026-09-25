@@ -16,6 +16,8 @@ export type CombatStance = "balanced" | "aggressive" | "defensive";
 export type PowerMode = "balanced" | "industrial" | "research" | "combat" | "navigation";
 export type StatusEffect = "radiation" | "hullBreach" | "sensorDisruption" | "overheating";
 export type OutpostType = "mining" | "research" | "trade";
+export type RestorationProjectId = "lightwell" | "habitat" | "concord";
+export type DroneDuty = "balanced" | "construction" | "escort" | "survey" | "freight";
 export const ACTIVE_CREW_SLOTS = 10;
 export const STARTING_CREW_IDS = ["mara", "jonas", "priya", "okafor", "sol", "mei", "rook", "elias", "vega", "anya"] as const;
 const KNOWN_CREW_IDS = [
@@ -23,6 +25,7 @@ const KNOWN_CREW_IDS = [
   "kest", "sable", "nadi", "dara", "miko", "iora", "soren", "tamsin", "oren", "ves",
   "brin", "yara", "tor", "linn", "garr", "cel", "pax", "aeri", "dell", "rhea",
   "nox", "thea", "quill", "kira", "unit-9",
+  "lyra", "cass", "ren", "tavi", "orin",
 ] as const;
 export type CombatEncounter = {
   targetId: string;
@@ -58,7 +61,7 @@ export type CombatState = {
 };
 
 export type GameState = {
-  version: 6;
+  version: 7;
   displayName: string;
   credits: number;
   skills: Record<SkillId, SkillProgress>;
@@ -80,7 +83,9 @@ export type GameState = {
   crewLoyalty: Record<string, number>;
   crewMorale: number;
   powerMode: PowerMode;
+  droneDuty: DroneDuty;
   outposts: Record<string, { type: OutpostType; level: number }>;
+  restoration: Record<RestorationProjectId, number>;
   drones: Record<DroneId, number>;
   vehicles: Record<VehicleId, number>;
   researchUnlocked: string[];
@@ -113,7 +118,8 @@ const startingInventory: Record<string, number> = {
   genesisSeed: 0, genesisCompound: 0, voidData: 0, commandToken: 0,
   phaseFilament: 0, bioLumen: 0, voidLens: 0, sentinelCipher: 0,
   riftAlloy: 0, phaseLattice: 0, repairNanites: 0,
-  gearPhaseLance: 0, gearLivingBulwark: 0, gearChronoDrive: 0, gearFoundryHeart: 0, gearStarfallCrown: 0,
+  sunsteel: 0, civicCore: 0, lumenGel: 0, concordSeal: 0,
+  gearPhaseLance: 0, gearLivingBulwark: 0, gearChronoDrive: 0, gearFoundryHeart: 0, gearStarfallCrown: 0, gearDawnAegis: 0, gearCrownbreaker: 0,
 };
 
 export const MAX_SKILL_LEVEL = 100;
@@ -168,7 +174,7 @@ export function defaultGameState(): GameState {
   const skills = Object.fromEntries(SKILL_IDS.map((id) => [id, { xp: 0, level: 1 }])) as Record<SkillId, SkillProgress>;
   const mastery = Object.fromEntries(SKILL_IDS.map((id) => [id, 0])) as Record<SkillId, number>;
   return {
-    version: 6,
+    version: 7,
     displayName: "",
     credits: 180,
     skills,
@@ -190,7 +196,9 @@ export function defaultGameState(): GameState {
     crewLoyalty: Object.fromEntries(KNOWN_CREW_IDS.map((id) => [id, 50])),
     crewMorale: 80,
     powerMode: "balanced",
+    droneDuty: "balanced",
     outposts: {},
+    restoration: { lightwell: 0, habitat: 0, concord: 0 },
     drones: { mining: 0, salvage: 0, survey: 0, combat: 0, cargo: 0 },
     vehicles: { rover: 0, boardingShuttle: 0 },
     researchUnlocked: [],
@@ -280,7 +288,7 @@ export function sanitizeGameState(value: unknown): GameState {
   const expeditionInput = input.activeExpedition && typeof input.activeExpedition === "object" ? input.activeExpedition as Record<string, unknown> : null;
   const combatInput = input.combat && typeof input.combat === "object" ? input.combat as Record<string, unknown> : {};
   const victoriesInput = combatInput.victories && typeof combatInput.victories === "object" ? combatInput.victories as Record<string, unknown> : {};
-  const saveVersion = boundedNumber(input.version, 0, 6);
+  const saveVersion = boundedNumber(input.version, 0, 7);
   const outpostsInput = input.outposts && typeof input.outposts === "object" ? input.outposts as Record<string, unknown> : {};
 
   const skills = Object.fromEntries(SKILL_IDS.map((id) => {
@@ -301,7 +309,7 @@ export function sanitizeGameState(value: unknown): GameState {
   const roster = sanitizeCrewRoster(input);
 
   return {
-    version: 6,
+    version: 7,
     displayName: typeof input.displayName === "string" ? input.displayName.trim().slice(0, 32) : "",
     credits: boundedNumber(input.credits, defaults.credits),
     skills,
@@ -332,11 +340,20 @@ export function sanitizeGameState(value: unknown): GameState {
     crewLoyalty: crewRecord(input.crewLoyalty, 50, 100),
     crewMorale: boundedNumber(input.crewMorale, defaults.crewMorale, 100),
     powerMode: ["balanced", "industrial", "research", "combat", "navigation"].includes(String(input.powerMode)) ? input.powerMode as PowerMode : "balanced",
-    outposts: Object.fromEntries(Object.entries(outpostsInput).filter(([sectorId, value]) => ["erebus", "helix", "cinder", "orpheus", "silent"].includes(sectorId) && value && typeof value === "object").map(([sectorId, value]) => {
+    droneDuty: ["balanced", "construction", "escort", "survey", "freight"].includes(String(input.droneDuty)) ? input.droneDuty as DroneDuty : "balanced",
+    outposts: Object.fromEntries(Object.entries(outpostsInput).filter(([sectorId, value]) => ["erebus", "helix", "cinder", "orpheus", "silent", "aurelia"].includes(sectorId) && value && typeof value === "object").map(([sectorId, value]) => {
       const raw = value as Record<string, unknown>;
       const type = ["mining", "research", "trade"].includes(String(raw.type)) ? raw.type as OutpostType : "mining";
       return [sectorId, { type, level: Math.max(1, boundedNumber(raw.level, 1, 10)) }];
     })),
+    restoration: (() => {
+      const raw = input.restoration && typeof input.restoration === "object" ? input.restoration as Record<string, unknown> : {};
+      return {
+        lightwell: boundedNumber(raw.lightwell, 0, 4),
+        habitat: boundedNumber(raw.habitat, 0, 4),
+        concord: boundedNumber(raw.concord, 0, 4),
+      };
+    })(),
     drones: numericRecord(input.drones, defaults.drones, 100),
     vehicles: numericRecord(input.vehicles, defaults.vehicles, 20),
     researchUnlocked: stringList(input.researchUnlocked),

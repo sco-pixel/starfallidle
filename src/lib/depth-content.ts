@@ -111,6 +111,75 @@ export const advancedActivities: Activity[] = (Object.keys(operationNames) as Ex
   }),
 );
 
+// Aurelia deliberately adds depth without raising the level cap. Four skills get
+// an extra operation because their strategic loop needs more than a single output.
+const aureliaNames: Record<Exclude<SkillId, "combat">, string[]> = {
+  mining: ["Sunsteel Scree", "Corona Vein", "Heliostat Foundation", "Dawn-Mantle Bore"],
+  salvage: ["Mirror Shard Recovery", "Civic Relay Hulk", "Sleeper Ring Wreck", "Crownbreaker Debris"],
+  botany: ["Lumen Moss Beds", "Sunroot Nursery", "Habitat Canopy", "Dawn Orchard"],
+  engineering: ["Mirror Truss Repair", "Habitat Spine", "Civic Core Assembly", "Corona Shield Array"],
+  metallurgy: ["Sunsteel Tempering", "Prism Alloy Press", "Habitat Plating", "Dawnforge Crucible"],
+  biochemistry: ["Lumen Antibody", "Flare Stabiliser", "Sleeper Revival Medium", "Solar Symbiote Culture"],
+  science: ["Corona Harmonic Study", "Civic Memory Reconstruction", "Lightwell Resonance", "Aurelia Genesis Model"],
+  medicine: ["Flare Trauma Clinic", "Sleeper Triage", "Habitat Preventative Care", "Lumen Exposure Therapy", "Daybreak Recovery Protocol"],
+  astrogation: ["Lightwell Corridor", "Mirror Transit Solution", "Corona Transfer", "Refugee Route Plan", "Aurelia Safe-Passage Model"],
+  drones: ["Mirror Maintenance Swarm", "Habitat Construction Wing", "Corona Survey Mesh", "Civic Escort Formation"],
+  logistics: ["Emergency Supply Shuttle", "Habitat Freight Loop", "Mirror Construction Convoy", "Aurelia Relief Network", "Concord Distribution Plan"],
+  diplomacy: ["Shelter Council", "Machine Kin Hearing", "Habitat Labour Compact", "Aurelia Charter Session", "Concord Ratification"],
+  archaeology: ["First Harbor Archive", "Aurelia Founders' Vault", "Sleeper Memorial Survey", "Dawn-Era Testament"],
+};
+
+const aureliaLevels = (skillId: Exclude<SkillId, "combat">) => ["medicine", "astrogation", "logistics", "diplomacy"].includes(skillId)
+  ? [73, 78, 84, 90, 97]
+  : [76, 82, 89, 96];
+
+function aureliaRecipe(skillId: Exclude<SkillId, "combat">, tier: number): { produces: Record<string, number>; consumes?: Record<string, number> } {
+  const amount = 3 + tier * 2;
+  switch (skillId) {
+    case "mining": return { produces: { sunsteel: amount, phaseCrystal: Math.max(1, tier) } };
+    case "salvage": return { produces: { civicCore: 1 + tier, salvage: amount }, consumes: { powerCell: 2 + tier } };
+    case "botany": return { produces: { lumenGel: 2 + tier * 2, rations: amount }, consumes: { algae: 5 + tier * 2, catalyst: 2 } };
+    case "engineering": return { produces: { civicCore: 1 + tier, repairNanites: 1 + tier }, consumes: { sunsteel: 4 + tier * 3, circuits: 5 + tier * 2, powerCell: 2 + tier } };
+    case "metallurgy": return { produces: { sunsteel: 1 + tier, phaseLattice: 1 + tier }, consumes: { sunsteel: 5 + tier * 3, neutronium: 2 + tier } };
+    case "biochemistry": return { produces: { lumenGel: 2 + tier, medicine: amount }, consumes: { catalyst: 4 + tier, neuralGel: 2 + tier } };
+    case "science": return { produces: { civicCore: 1 + tier, voidData: amount }, consumes: { data: 12 + tier * 4, phaseCrystal: 2 + tier } };
+    case "medicine": return { produces: { medicine: amount + 3, lumenGel: 1 + tier }, consumes: { medicine: 3 + tier, lumenGel: 2 + tier } };
+    case "astrogation": return { produces: { navData: amount * 2, concordSeal: tier >= 3 ? 1 : 0 }, consumes: { data: 10 + tier * 4, fuelRod: 1 + Math.floor(tier / 2) } };
+    case "drones": return { produces: { droneParts: amount, civicCore: 1 + tier }, consumes: { droneParts: 4 + tier * 2, powerCell: 3 + tier } };
+    case "logistics": return { produces: { concordSeal: 1 + Math.floor(tier / 2), droneParts: amount }, consumes: { rations: 5 + tier * 3, medicine: 2 + tier, fuelRod: 1 + Math.floor(tier / 2) } };
+    case "diplomacy": return { produces: { concordSeal: 1 + Math.floor(tier / 2), navData: amount }, consumes: { rations: 5 + tier * 2, data: 10 + tier * 3, relic: 2 + tier } };
+    case "archaeology": return { produces: { civicCore: 1 + tier, artefact: 1 + Math.floor(tier / 2) }, consumes: { data: 12 + tier * 4, powerCell: 3 + tier, relic: 3 + tier } };
+  }
+}
+
+export const aureliaActivities: Activity[] = (Object.keys(aureliaNames) as Exclude<SkillId, "combat">[]).flatMap((skillId) =>
+  aureliaNames[skillId].map((name, tier) => {
+    const recipe = aureliaRecipe(skillId, tier);
+    return {
+      id: `aurelia-${skillId}-${tier + 1}`,
+      skillId,
+      name,
+      level: aureliaLevels(skillId)[tier],
+      seconds: 22 + tier * 4,
+      xp: 460 + tier * 90,
+      description: "Advance the Aurelia restoration effort through a specialist operation.",
+      produces: recipe.produces,
+      consumes: recipe.consumes,
+      credits: ["logistics", "diplomacy", "salvage"].includes(skillId) ? 800 + tier * 180 : undefined,
+      sectors: ["aurelia"],
+      collectionId: `aurelia-${skillId}-${tier + 1}`,
+    };
+  }),
+);
+
+export const aureliaCombatActivities: Activity[] = [
+  { id: "aurelia-flare-raiders", skillId: "combat", name: "Flare Raider Wing", level: 82, seconds: 34, xp: 760, description: "Break raiders preying on the first Aurelia relief runs.", produces: { sunsteel: 4, civicCore: 1 }, credits: 900, damage: 96, sectors: ["aurelia"], enemy: { hull: 1600, shields: 460, armor: 120, evasion: 32, class: "Aurelia Hostile", weakness: "missile", rareEvery: 16, rareDrop: { concordSeal: 1 } }, collectionId: "aurelia-flare-raiders" },
+  { id: "aurelia-mirror-wraith", skillId: "combat", name: "Mirror Wraith", level: 87, seconds: 38, xp: 850, description: "Disable a mirror-defense intelligence that cannot distinguish rescue craft from intruders.", produces: { civicCore: 3, quantumCircuit: 3 }, credits: 1050, damage: 108, sectors: ["aurelia"], enemy: { hull: 1830, shields: 520, armor: 132, evasion: 26, class: "Aurelia Hostile", weakness: "laser", rareEvery: 17, rareDrop: { lumenGel: 4 } }, collectionId: "aurelia-mirror-wraith" },
+  { id: "aurelia-crown-vessel", skillId: "combat", name: "Crownbreaker Vessel", level: 92, seconds: 43, xp: 950, description: "Turn aside a warship enforcing the old stellar order.", produces: { sunsteel: 8, concordSeal: 1 }, credits: 1250, damage: 120, sectors: ["aurelia"], enemy: { hull: 2100, shields: 600, armor: 150, evasion: 30, class: "Aurelia Hostile", weakness: "railgun", rareEvery: 18, rareDrop: { gearDawnAegis: 1 } }, collectionId: "aurelia-crown-vessel" },
+  { id: "aurelia-heliarch", skillId: "combat", name: "Heliarch Custodian", level: 97, seconds: 50, xp: 1100, description: "Defeat the guardian blocking the restored lightwell.", produces: { civicCore: 8, phaseLattice: 5 }, credits: 1600, damage: 136, sectors: ["aurelia"], enemy: { hull: 2600, shields: 720, armor: 168, evasion: 24, class: "Sector Boss", weakness: "laser", rareEvery: 20, rareDrop: { gearCrownbreaker: 1 } }, collectionId: "aurelia-heliarch" },
+  { id: "aurelia-ashen-crown", skillId: "combat", name: "Ashen Crown", level: 100, seconds: 60, xp: 1300, description: "Face the final machine court after the Lightwell Array comes online.", produces: { singularityCore: 2, commandToken: 1 }, credits: 2200, damage: 152, sectors: ["aurelia"], enemy: { hull: 3200, shields: 920, armor: 190, evasion: 30, class: "Final Boss", weakness: "missile", rareEvery: 20, rareDrop: { concordSeal: 4, ancientCore: 8 } }, collectionId: "aurelia-ashen-crown" },
+];
+
 export const bossActivities: Activity[] = [
   { id: "boss-corsair-carrier", skillId: "combat", name: "Corsair Carrier", level: 30, seconds: 26, xp: 210, description: "Break a carrier group controlling the Cinder trade lanes.", produces: { titanium: 5, quantumCircuit: 2 }, credits: 240, damage: 48, sectors: ["cinder", "orpheus", "silent"], enemy: { hull: 420, shields: 120, armor: 58, evasion: 22, class: "Sector Boss", weakness: "missile", rareEvery: 12, rareDrop: { gearPhaseLance: 1 } }, collectionId: "boss-carrier" },
   { id: "boss-helix-bioship", skillId: "combat", name: "Helix Bio-Ship", level: 45, seconds: 31, xp: 330, description: "Contain an escaped research organism grown around a warship hull.", produces: { neuralGel: 6, xenoFiber: 8 }, credits: 360, damage: 62, sectors: ["helix", "orpheus", "silent"], enemy: { hull: 610, shields: 180, armor: 42, evasion: 30, class: "Sector Boss", weakness: "laser", rareEvery: 14, rareDrop: { gearLivingBulwark: 1 } }, collectionId: "boss-bioship" },
@@ -154,6 +223,8 @@ export const uniqueGear = {
   gearChronoDrive: { name: "Chrono Drive", effect: "All operations 8% faster" },
   gearFoundryHeart: { name: "Foundry Heart", effect: "+2 manufactured output" },
   gearStarfallCrown: { name: "Starfall Crown", effect: "All gear effects at half strength" },
+  gearDawnAegis: { name: "Dawn Aegis", effect: "10% less incoming damage in Aurelia" },
+  gearCrownbreaker: { name: "Crownbreaker Array", effect: "+15% combat accuracy in Aurelia" },
 } as const;
 
 export const missionDefinitions = [

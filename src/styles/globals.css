@@ -778,6 +778,19 @@ h3 { font-size: 1rem; }
 .save-transfer-message.success { color: #79bd91; }
 .save-transfer-message.error { color: #e08888; }
 
+.ship-status, .drone-duty { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 20px; }
+.ship-status h2, .drone-duty h3 { margin: 3px 0 5px; }
+.ship-status p, .drone-duty p, .restoration-intro { margin: 0; color: #9ba9b7; font-size: .82rem; }
+.ship-status-metrics { display: flex; gap: 16px; }
+.ship-status-metrics span { display: grid; gap: 2px; color: #9ba9b7; font-size: .7rem; text-align: right; }
+.ship-status-metrics strong { color: #edf4f8; font-size: 1rem; }
+.drone-duty > div:last-child { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.restoration-grid { margin-top: 22px; }
+.restoration-intro { margin: -5px 0 14px; max-width: 680px; }
+.market-group-title { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px 0; }
+.market-group-title p { margin: 0; }
+.market-group-title span { color: #8492a0; font-size: .72rem; }
+
 @media (max-width: 1250px) {
   .game-layout.v3 { grid-template-columns: 225px minmax(470px, 1fr); }
   .v3-status { grid-column: 1 / -1; max-height: none; overflow: visible; display: grid; grid-template-columns: 1fr 1fr 2fr; position: static; }
@@ -786,6 +799,10 @@ h3 { font-size: 1rem; }
 }
 
 @media (max-width: 760px) {
+  .ship-status, .drone-duty { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .ship-status-metrics { width: 100%; justify-content: space-between; }
+  .ship-status-metrics span { text-align: left; }
+  .drone-duty > div:last-child { justify-content: flex-start; }
   .game-layout.v3 .command-nav { max-height: none; overflow: visible; }
   .game-layout.v3 .command-nav { order: 1; }
   .game-layout.v3 .play-column { order: 2; }
